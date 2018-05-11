@@ -104,7 +104,7 @@ void initGL()
 	backgroundProgram   = labhelper::loadShaderProgram("../lab6-shadowmaps/background.vert", "../lab6-shadowmaps/background.frag");
 	shaderProgram       = labhelper::loadShaderProgram("../lab6-shadowmaps/shading.vert",    "../lab6-shadowmaps/shading.frag");
 	simpleShaderProgram = labhelper::loadShaderProgram("../lab6-shadowmaps/simple.vert",     "../lab6-shadowmaps/simple.frag");
-	waterShaderProgram	= labhelper::loadShaderProgram("../lab6-shadowmaps/water.vert",		 "../lab6-shadowmaps/water.frag");
+	waterShaderProgram = labhelper::loadShaderProgram("../lab6-shadowmaps/water.vert", "../lab6-shadowmaps/water.frag");
 
 	///////////////////////////////////////////////////////////////////////
 	// Load models and set up model matrices
@@ -206,8 +206,8 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 
 	//Water
 	glUseProgram(currentShaderProgram);
-	vec3 material_color = vec3(1.f, 1.f, 1.f);
-	//labhelper::setUniformSlow(currentShaderProgram, "material_color", material_color);
+	vec3 material_color(1.f, 1.f, 1.f);
+	labhelper::setUniformSlow(currentShaderProgram, "material_color", material_color);
 
 	GLuint water_vert_buffer, water_index_buffer, vertexArrayObject;
 
@@ -303,7 +303,6 @@ void display(void)
 		glPolygonOffset(polygonOffset_factor, polygonOffset_units);
 	}
 	drawScene(simpleShaderProgram, lightViewMatrix, lightProjMatrix, lightViewMatrix, lightProjMatrix);
-//	drawScene(waterShaderProgram, lightViewMatrix, lightProjMatrix, lightViewMatrix, lightProjMatrix);
 
 	labhelper::Material &screen = landingpadModel->m_materials[8];
 	screen.m_emission_texture.gl_id = shadowMapFB.colorTextureTarget;
@@ -321,8 +320,7 @@ void display(void)
 	glClearColor(0.2, 0.2, 0.8, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	drawBackground(viewMatrix, projMatrix);
-//	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
-	drawScene(waterShaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
+	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	
 
 

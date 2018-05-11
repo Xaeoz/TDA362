@@ -13,6 +13,10 @@ uniform float environment_multiplier;
 
 void main() 
 {
+
+	fragmentColor = vec4(0.5, 0.5, 0.5, 1);
+
+	/*
 	// Calculate the world-space position of this fragment on the near plane
 	vec4 pixel_world_pos = inv_PV * vec4(texCoord * 2.0 - 1.0, 1.0, 1.0);
 	pixel_world_pos = (1.0 / pixel_world_pos.w) * pixel_world_pos;
@@ -24,7 +28,9 @@ void main()
 	if (phi < 0.0f) phi = phi + 2.0f * PI;
 	// Use these to lookup the color in the environment map
 	vec2 lookup = vec2(phi / (2.0 * PI), theta / PI);
-	fragmentColor = environment_multiplier * texture(environmentMap, lookup);
+	fragmentColor = environment_multiplier * texture(environmentMap, lookup);*/
+
+	
 }
 
 
