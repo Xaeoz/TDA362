@@ -21,6 +21,7 @@ using namespace glm;
 #include <Model.h>
 #include "hdr.h"
 #include "fbo.h"
+#include "heightfield.h"
 
 
 
@@ -37,6 +38,7 @@ float previousTime = 0.0f;
 float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
+HeightField terrain;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
@@ -44,11 +46,13 @@ int windowWidth, windowHeight;
 GLuint shaderProgram; // Shader for rendering the final image
 GLuint simpleShaderProgram; // Shader used to draw the shadow map
 GLuint backgroundProgram;
+GLuint heightShader;
+GLuint waterShader;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
 ///////////////////////////////////////////////////////////////////////////////
-float environment_multiplier = 1.5f;
+float environment_multiplier = 1.0f;
 GLuint environmentMap, irradianceMap, reflectionMap;
 const std::string envmap_base_name = "001";
 
@@ -83,6 +87,7 @@ labhelper::Model *sphereModel = nullptr;
 mat4 roomModelMatrix;
 mat4 landingPadModelMatrix; 
 mat4 fighterModelMatrix;
+mat4 terrainModelMatrix;
 
 void loadShaders(bool is_reload)
 {
@@ -90,6 +95,8 @@ void loadShaders(bool is_reload)
 	if (shader != 0) simpleShaderProgram = shader; 
 	shader = labhelper::loadShaderProgram("../project/background.vert", "../project/background.frag", is_reload);
 	if (shader != 0) backgroundProgram = shader;
+	shader = labhelper::loadShaderProgram("../project/water.vert", "../project/water.frag");
+	if (shader != 0) waterShader = shader;
 	shader = labhelper::loadShaderProgram("../project/shading.vert", "../project/shading.frag", is_reload);
 	if (shader != 0) shaderProgram = shader;
 }
@@ -99,9 +106,11 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	//		Load Shaders
 	///////////////////////////////////////////////////////////////////////
-	backgroundProgram   = labhelper::loadShaderProgram("../project/background.vert", "../project/background.frag");
-	shaderProgram       = labhelper::loadShaderProgram("../project/shading.vert",    "../project/shading.frag");
-	simpleShaderProgram = labhelper::loadShaderProgram("../project/simple.vert",     "../project/simple.frag");
+	backgroundProgram   = labhelper::loadShaderProgram("../project/background.vert",  "../project/background.frag");
+	shaderProgram       = labhelper::loadShaderProgram("../project/shading.vert",     "../project/shading.frag");
+	simpleShaderProgram = labhelper::loadShaderProgram("../project/simple.vert",      "../project/simple.frag");
+	heightShader		= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag");
+	waterShader			= labhelper::loadShaderProgram("../project/water.vert",		  "../project/water.frag");
 
 	///////////////////////////////////////////////////////////////////////
 	// Load models and set up model matrices
@@ -111,9 +120,10 @@ void initGL()
 	sphereModel     = labhelper::loadModelFromOBJ("../scenes/sphere.obj");
 
 	roomModelMatrix = mat4(1.0f);
-	fighterModelMatrix = translate(15.0f * worldUp);
-	landingPadModelMatrix = mat4(1.0f);
-
+	fighterModelMatrix = translate(35.0f * worldUp);
+	landingPadModelMatrix = translate(20.0f* worldUp);
+	terrainModelMatrix = glm::scale(vec3(1000.0f, 333.0f, 1000.0f));
+	terrain.generateMesh(262144);
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
 	///////////////////////////////////////////////////////////////////////
@@ -125,6 +135,10 @@ void initGL()
 	reflectionMap = labhelper::loadHdrMipmapTexture(filenames);
 	environmentMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + ".hdr");
 	irradianceMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + "_irradiance.hdr");
+
+	//Load terrain textures
+	terrain.loadHeightField("../scenes/nlsFinland/L3123F.png");
+	terrain.loadDiffuseTexture("../scenes/nlsFinland/L3123F_downscaled.jpg");
 
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
@@ -183,6 +197,49 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
 
 	labhelper::render(fighterModel);
+
+	//Water
+	glUseProgram(waterShader);
+	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
+	vec3 material_color = vec3(1.f, 1.f, 1.f);
+
+	//labhelper::setUniformSlow(currentShaderProgram, "material_color", material_color);
+
+	GLuint water_vert_buffer, water_index_buffer, vertexArrayObject;
+
+	glGenVertexArrays(1, &vertexArrayObject);
+	glBindVertexArray(vertexArrayObject);
+	const float magnitude = 100;
+
+	float verts[] = { -1, 0, 1,	//v0
+		1, 0, 1, 	//v1
+		1, 0, -1, 	//v2 
+		-1, 0, -1,	//v3
+	};
+
+	for (int i = 0; i < sizeof(verts) / sizeof(float); i++)
+	{
+		verts[i] = verts[i] * magnitude;
+	}
+
+	glGenBuffers(1, &water_vert_buffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, water_vert_buffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(0, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(0);
+
+	const int indices[] = { 0,1,3, 3,1,2 };
+
+	glGenBuffers(1, &water_index_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, water_index_buffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+
+
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+	
+	
 }
 
 
@@ -236,6 +293,23 @@ void display(void)
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));
 
+	glUseProgram(heightShader);
+	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
+	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
+	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
+	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
+	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
+	// Environment
+	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier*3);
+
+	// camera
+	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
+	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
+	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projMatrix * viewMatrix * terrainModelMatrix);
+	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
+	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
+	labhelper::setUniformSlow(heightShader, "normalMatrix", inverse(transpose(viewMatrix * terrainModelMatrix)));
+	terrain.submitTriangles();
 
 
 }

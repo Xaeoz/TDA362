@@ -4,6 +4,7 @@
 precision highp float;
 
 uniform vec3 material_color;
+layout(binding = 10) uniform sampler2D diffuseMap;
 
 
 in vec2 texCoord;
@@ -16,5 +17,6 @@ void main()
 {
 	//fragmentColor = vec4(texCoord.x, texCoord.y, 0.0, 1.0);
 	//fragmentColor = vec4(1, 1, 1, 1);
-	fragmentColor = vec4(material_color, 1.0);
+	//fragmentColor = vec4(material_color, 1.0);
+	fragmentColor = texture2D(diffuseMap, texCoord.xy);
 }
