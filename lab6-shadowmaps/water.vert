@@ -1,11 +1,9 @@
 #version 420
-// This vertex shader simply outputs the input coordinates to the rasterizer. It only uses 2D coordinates.
-layout(location = 0) in vec2 position;
 
-out vec2 texCoord;
+layout(location = 0) in vec3 position;
+uniform mat4 modelViewProjectionMatrix;
 
 void main()
 {
-	gl_Position = vec4(position, 0.0, 1.0);
-	texCoord = 0.5 * (position + vec2(1, 1));
+	gl_Position = modelViewProjectionMatrix * vec4(position.x, position.y, position.z, 1.0);
 }

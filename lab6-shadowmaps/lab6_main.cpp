@@ -103,8 +103,8 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	backgroundProgram   = labhelper::loadShaderProgram("../lab6-shadowmaps/background.vert", "../lab6-shadowmaps/background.frag");
 	shaderProgram       = labhelper::loadShaderProgram("../lab6-shadowmaps/shading.vert",    "../lab6-shadowmaps/shading.frag");
+	waterShaderProgram = labhelper::loadShaderProgram("../lab6-shadowmaps/water.vert",		 "../lab6-shadowmaps/water.frag");
 	simpleShaderProgram = labhelper::loadShaderProgram("../lab6-shadowmaps/simple.vert",     "../lab6-shadowmaps/simple.frag");
-	waterShaderProgram	= labhelper::loadShaderProgram("../lab6-shadowmaps/water.vert",		 "../lab6-shadowmaps/water.frag");
 
 	///////////////////////////////////////////////////////////////////////
 	// Load models and set up model matrices
@@ -113,7 +113,7 @@ void initGL()
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
 	sphereModel = labhelper::loadModelFromOBJ("../scenes/sphere.obj");
   
-	roomModelMatrix =  mat4(1.0f);
+	roomModelMatrix = translate(-50.0f * worldUp);
 	fighterModelMatrix = translate(15.0f * worldUp);
 
 	///////////////////////////////////////////////////////////////////////
@@ -168,7 +168,7 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	mat4 lightMatrix = lightProjectionMatrix * lightViewMatrix * inverse(viewMatrix);
 	mat4 scaledMatrix = scale(vec3(0.5, 0.5, 0.5))*lightMatrix;
 	mat4 translatedMatrix = translate(vec3(0.5, 0.5, 0.5))*scaledMatrix;
-	/*labhelper::setUniformSlow(currentShaderProgram, "lightMatrix", translatedMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "lightMatrix", translatedMatrix);
 
 
 
@@ -200,12 +200,13 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
 
-	labhelper::render(fighterModel);*/
+	labhelper::render(fighterModel);
 
 	//Terrain
 
 	//Water
-	glUseProgram(currentShaderProgram);
+	glUseProgram(waterShaderProgram);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * roomModelMatrix);
 	vec3 material_color = vec3(1.f, 1.f, 1.f);
 	//labhelper::setUniformSlow(currentShaderProgram, "material_color", material_color);
 
@@ -321,8 +322,8 @@ void display(void)
 	glClearColor(0.2, 0.2, 0.8, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	drawBackground(viewMatrix, projMatrix);
-//	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
-	drawScene(waterShaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
+	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
+	//drawScene(waterShaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix);
 	
 
 
