@@ -46,6 +46,7 @@ uniform float point_light_intensity_multiplier;
 in vec2 texCoord;
 in vec3 viewSpaceNormal;
 in vec3 viewSpacePosition;
+in vec4 normal;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Input uniform variables
@@ -89,7 +90,7 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	float s = material_shininess;
 	//float F = material_fresnel + (1 - material_fresnel) * pow((1 - dot(wh, wi)), 5);
 	float F = material_fresnel + (1 - material_fresnel) * pow((1 - dot(wh, wi)), 5);
-	float D = ((s + 2) / 2 * PI) * pow(dot(n, wh), s);
+	float D = ((s + 2) / 2 * PI) * pow(abs(dot(n, wh)), s);
 	float G = min(1, min((2 * (dot(n, wh) * dot(n, wo))) / dot(wh, wo), (2 * (dot(n, wh)  *dot(n, wi))) / dot(wh, wo)));
 	float brdf = (F * D * G) / (4 * dot(n, wo) * dot(n, wi));
 	///////////////////////////////////////////////////////////////////////////
@@ -182,7 +183,9 @@ void main()
 		indirect_illumination_term +
 		emission_term;
 
-	fragmentColor = vec4(shading, 1.0);
+	fragmentColor = vec4(shading, 1.0f);
+	//fragmentColor = normalize(vec4(viewSpaceNormal, 0.0f));
+	//fragmentColor = normalize(normal);
 	return;
 
 }

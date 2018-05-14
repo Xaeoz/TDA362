@@ -58,7 +58,7 @@ void HeightField::loadNormalMap(const std::string &normalPath)
 {
 	int width, height, components;
 	stbi_set_flip_vertically_on_load(true);
-	float * data = stbi_loadf(normalPath.c_str(), &width, &height, &components, 1);
+	float * data = stbi_loadf(normalPath.c_str(), &width, &height, &components, 3);
 	if (data == nullptr) {
 		std::cout << "Failed to load image: " << normalPath << ".\n";
 		return;
@@ -73,10 +73,10 @@ void HeightField::loadNormalMap(const std::string &normalPath)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, data); // just one component (float)
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, data); // just one component (float)
 
 	m_normalPath = normalPath;
-	std::cout << "Successfully loaded heigh field texture: " << normalPath << ".\n";
+	std::cout << "Successfully loaded normal map: " << normalPath << ".\n";
 }
 
 void HeightField::loadDiffuseTexture(const std::string &diffusePath)
@@ -220,11 +220,11 @@ void HeightField::generateMesh(int tesselation)
 	glVertexAttribPointer(3, 1, GL_INT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
 	glEnableVertexAttribArray(3);
 
-	glGenBuffers(1, &m_normalBuffer);													// Create a handle for the vertex position buffer
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_normalBuffer);									// Set the newly created buffer as the current one
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), texCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
-	glVertexAttribPointer(4, 1, GL_INT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
-	glEnableVertexAttribArray(4);
+	//glGenBuffers(1, &m_normalBuffer);													// Create a handle for the vertex position buffer
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_normalBuffer);									// Set the newly created buffer as the current one
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), texCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	//glVertexAttribPointer(4, 1, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	//glEnableVertexAttribArray(4);
 
 
 }

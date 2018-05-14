@@ -19,6 +19,7 @@ uniform mat4 modelViewProjectionMatrix;
 out vec2 texCoord;
 out vec3 viewSpaceNormal;
 out vec3 viewSpacePosition;
+out vec4 normal;
 
 
 void main() 
@@ -27,5 +28,6 @@ void main()
 	texCoord = texCoordIn; 
 	viewSpaceNormal = (normalMatrix * vec4(normalIn, 0.0)).xyz;
 	viewSpacePosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+	normal = vec4(normalIn, 1.0);
 
 }

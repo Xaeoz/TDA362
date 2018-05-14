@@ -146,8 +146,10 @@ void initGL()
 	//Load terrain textures
 	std::string heightFieldFilePath = "../res/land_with_pond.png";
 	std::string heightFieldTexture = "../res/wildgrass.png";
+	std::string heightFieldNormals = "../res/NormalMap.png";
 	terrain.loadHeightField(heightFieldFilePath);
 	terrain.loadDiffuseTexture(heightFieldTexture);
+	terrain.loadNormalMap(heightFieldNormals);
 
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
@@ -194,7 +196,7 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
 	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "normalMatrix", inverse(transpose(viewMatrix * terrainModelMatrix)));
+	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
 	//material
 	labhelper::setUniformSlow(heightShader, "material_reflectivity", .01f);
 	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
