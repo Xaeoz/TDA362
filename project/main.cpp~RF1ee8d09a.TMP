@@ -149,7 +149,7 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	// Setup water FBOs
 	///////////////////////////////////////////////////////////////////////
-	reflectionFbo.resize(1280, 720);
+	reflectionFbo.resize(320, 180);
 	refractionFbo.resize(1280, 720); 
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
@@ -198,7 +198,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(currentShaderProgram, "viewInverse", inverse(viewMatrix));
 
 	// landing pad 
-	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
@@ -206,7 +205,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::render(landingpadModel);
 
 	// Fighter
-	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
@@ -259,7 +257,7 @@ void drawQuad(float width, float height)
 
 	glUseProgram(simpleShaderProgram);
 	glActiveTexture(GL_TEXTURE10);
-	glBindTexture(GL_TEXTURE_2D, (reflectionFbo.colorTextureTargets.at(0)));
+	glBindTexture(GL_TEXTURE_2D, (refractionFbo.colorTextureTargets.at(0)));
 
 	//labhelper::drawFullScreenQuad();
 	//return;
@@ -328,7 +326,7 @@ void display(void)
 	glBindFramebuffer(GL_FRAMEBUFFER, reflectionFbo.framebufferId);
 	glViewport(0, 0, reflectionFbo.width, reflectionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -60));
+	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, 15));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw below water for refraction
@@ -336,7 +334,7 @@ void display(void)
 	glBindFramebuffer(GL_FRAMEBUFFER, refractionFbo.framebufferId);
 	glViewport(0, 0, refractionFbo.width, refractionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, 60));
+	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1, 0, 15));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera
