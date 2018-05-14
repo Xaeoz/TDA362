@@ -32,8 +32,8 @@ uniform float environment_multiplier;
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
 ///////////////////////////////////////////////////////////////////////////////
-uniform vec3 point_light_color = vec3(1.0, 1.0, 1.0);
-uniform float point_light_intensity_multiplier = 50.0;
+uniform vec3 point_light_color;
+uniform float point_light_intensity_multiplier;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -101,8 +101,9 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	vec3 microfacet_term = m * metal_term + (1 - m) * dielectric_term;
 	//return brdf * dot(n, wi) * Li;
 	float r = material_reflectivity;
-	return r * microfacet_term + (1 - r) * diffuse_term;
-	//return diffuse_term;
+	vec3 result = r * microfacet_term + (1 - r) * diffuse_term;
+	//return brdf * dot(n, wi) * Li;
+	return result;
 }
 
 vec3 calculateIndirectIllumination(vec3 wo, vec3 n)
@@ -145,7 +146,10 @@ vec3 calculateIndirectIllumination(vec3 wo, vec3 n)
 	float m = material_metalness;
 	float r = material_reflectivity;
 	vec3 microfacet_term = m * metal_term + (1 - m) * dielectric_term;
-	return r * microfacet_term + (1 - r) * diffuse_term;
+
+	vec3 result = r * microfacet_term + (1 - r) * diffuse_term;
+	return result;
+
 }
 void main() 
 {
