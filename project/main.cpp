@@ -53,6 +53,7 @@ GLuint waterShader;
 // Water
 ///////////////////////////////////////////////////////////////////////////////
 FboInfo reflectionFbo, refractionFbo;
+float waterYPos = 35.0f;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -219,7 +220,14 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	glUseProgram(waterShader);
-	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * translate(35.0f * worldUp));
+	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * translate(waterYPos * worldUp));
+	glActiveTexture(GL_TEXTURE9);
+	glBindTexture(GL_TEXTURE_2D, reflectionFbo.colorTextureTargets[0]);
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_2D, refractionFbo.colorTextureTargets[0]);
+	
+
+	//Generate base mesh
 	GLuint water_vert_buffer, water_index_buffer, vertexArrayObject;
 
 	glGenVertexArrays(1, &vertexArrayObject);
@@ -328,7 +336,13 @@ void display(void)
 	glBindFramebuffer(GL_FRAMEBUFFER, reflectionFbo.framebufferId);
 	glViewport(0, 0, reflectionFbo.width, reflectionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -60));
+	//distance to move camera to move "below" water
+	float distance = 2 * cameraPosition.y;  //Assuming water is on 0
+	vec3 reflectionCameraPosition = cameraPosition + worldUp * distance;
+	mat4 pitch = rotate(cameraDirection.y, normalize(cross(cameraDirection, worldUp)));
+	vec3 reflectCameraDirection = vec3(pitch * vec4(cameraDirection, 0.0f));
+	mat4 reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + reflectCameraDirection, worldUp);
+	drawScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -60));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw below water for refraction

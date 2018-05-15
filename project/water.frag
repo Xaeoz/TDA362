@@ -4,10 +4,16 @@
 precision highp float;
 
 //uniform vec3 material_color;
+in vec2 texCoords;
 
 layout(location = 0) out vec4 fragmentColor;
 
+layout(binding = 9) uniform sampler2D reflectionTexture;
+layout(binding = 10) uniform sampler2D refractionTexture;
+
 void main()
 {
-	fragmentColor = vec4(1.0, 1.0, 1.0, 1.0);
+	vec4 reflectionColor = texture2D(reflectionTexture, texCoords);
+	vec4 refractionColor = texture2D(refractionTexture, texCoords);
+	fragmentColor = mix(reflectionColor, refractionColor, 0.5);
 }
