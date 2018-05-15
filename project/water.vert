@@ -2,12 +2,14 @@
 
 layout(location = 0) in vec3 position;
 
+out vec4 clipSpaceCoords;
+
 uniform mat4 modelViewProjectionMatrix;
 
-out vec2 texCoord;
+
 
 void main()
 {
-	gl_Position = modelViewProjectionMatrix * vec4(position.x, position.y, position.z, 1.0);
-	texCoord = 0.5 * (normalize(position).xz + vec2(1, 1));
+	clipSpaceCoords = modelViewProjectionMatrix * vec4(position.x, position.y, position.z, 1.0);
+	gl_Position = clipSpaceCoords;
 }

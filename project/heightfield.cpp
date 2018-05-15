@@ -23,6 +23,9 @@ HeightField::HeightField(void)
 	, m_texid_diffuse(UINT32_MAX)
 	, m_heightFieldPath("")
 	, m_diffuseTexturePath("")
+	, m_texid_normal(UINT32_MAX)
+	, m_normalBuffer(UINT32_MAX)
+	, m_normalPath("")
 {
 }
 
@@ -49,6 +52,31 @@ void HeightField::loadHeightField(const std::string &heigtFieldPath)
 
 	m_heightFieldPath = heigtFieldPath;
 	std::cout << "Successfully loaded heigh field texture: " << heigtFieldPath << ".\n";
+}
+
+void HeightField::loadNormalMap(const std::string &normalPath)
+{
+	int width, height, components;
+	stbi_set_flip_vertically_on_load(true);
+	float * data = stbi_loadf(normalPath.c_str(), &width, &height, &components, 3);
+	if (data == nullptr) {
+		std::cout << "Failed to load image: " << normalPath << ".\n";
+		return;
+	}
+
+	if (m_texid_normal == UINT32_MAX) {
+		glGenTextures(1, &m_texid_normal);
+	}
+	glBindTexture(GL_TEXTURE_2D, m_texid_normal);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, data); // just one component (float)
+
+	m_normalPath = normalPath;
+	std::cout << "Successfully loaded normal map: " << normalPath << ".\n";
 }
 
 void HeightField::loadDiffuseTexture(const std::string &diffusePath)
@@ -154,7 +182,7 @@ void HeightField::generateMesh(int tesselation)
 		}
 
 		if (r < rows - 1) {
-			indices[idx++] = 9999;
+			indices[idx++] = 999999999;
 			//printf(", %i, ", indices[-1]);
 		}
 	}
@@ -189,8 +217,14 @@ void HeightField::generateMesh(int tesselation)
 	glGenBuffers(1, &m_indexBuffer);													// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);									// Set the newly created buffer as the current one
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_numIndices * sizeof(int), indices, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
-		
+	glVertexAttribPointer(3, 1, GL_INT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(3);
 
+	//glGenBuffers(1, &m_normalBuffer);													// Create a handle for the vertex position buffer
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_normalBuffer);									// Set the newly created buffer as the current one
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), texCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	//glVertexAttribPointer(4, 1, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	//glEnableVertexAttribArray(4);
 
 
 }
@@ -204,7 +238,7 @@ void HeightField::submitTriangles(void)
 	
 
 	glEnable(GL_PRIMITIVE_RESTART);
-	glPrimitiveRestartIndex(9999);
+	glPrimitiveRestartIndex(999999999);
 	glBindVertexArray(m_vao);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -213,6 +247,8 @@ void HeightField::submitTriangles(void)
 	glBindTexture(GL_TEXTURE_2D, m_texid_hf);
 	glActiveTexture(GL_TEXTURE20);
 	glBindTexture(GL_TEXTURE_2D, m_texid_diffuse);
+	glActiveTexture(GL_TEXTURE21);
+	glBindTexture(GL_TEXTURE_2D, m_texid_normal);
 
 
 	glDrawElements(GL_TRIANGLE_STRIP, m_numIndices, GL_UNSIGNED_INT, 0);

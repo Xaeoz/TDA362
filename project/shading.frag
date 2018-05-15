@@ -32,8 +32,8 @@ uniform float environment_multiplier;
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
 ///////////////////////////////////////////////////////////////////////////////
-uniform vec3 point_light_color = vec3(1.0, 1.0, 1.0);
-uniform float point_light_intensity_multiplier = 50.0;
+uniform vec3 point_light_color;
+uniform float point_light_intensity_multiplier;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Constants
@@ -46,6 +46,7 @@ uniform float point_light_intensity_multiplier = 50.0;
 in vec2 texCoord;
 in vec3 viewSpaceNormal;
 in vec3 viewSpacePosition;
+in vec4 normal;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Input uniform variables
@@ -89,7 +90,7 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	float s = material_shininess;
 	//float F = material_fresnel + (1 - material_fresnel) * pow((1 - dot(wh, wi)), 5);
 	float F = material_fresnel + (1 - material_fresnel) * pow((1 - dot(wh, wi)), 5);
-	float D = ((s + 2) / 2 * PI) * pow(dot(n, wh), s);
+	float D = ((s + 2) / 2 * PI) * pow(abs(dot(n, wh)), s);
 	float G = min(1, min((2 * (dot(n, wh) * dot(n, wo))) / dot(wh, wo), (2 * (dot(n, wh)  *dot(n, wi))) / dot(wh, wo)));
 	float brdf = (F * D * G) / (4 * dot(n, wo) * dot(n, wi));
 	///////////////////////////////////////////////////////////////////////////
@@ -101,8 +102,9 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	vec3 microfacet_term = m * metal_term + (1 - m) * dielectric_term;
 	//return brdf * dot(n, wi) * Li;
 	float r = material_reflectivity;
-	return r * microfacet_term + (1 - r) * diffuse_term;
-	//return diffuse_term;
+	vec3 result = r * microfacet_term + (1 - r) * diffuse_term;
+	//return brdf * dot(n, wi) * Li;
+	return result;
 }
 
 vec3 calculateIndirectIllumination(vec3 wo, vec3 n)
@@ -145,7 +147,10 @@ vec3 calculateIndirectIllumination(vec3 wo, vec3 n)
 	float m = material_metalness;
 	float r = material_reflectivity;
 	vec3 microfacet_term = m * metal_term + (1 - m) * dielectric_term;
-	return r * microfacet_term + (1 - r) * diffuse_term;
+
+	vec3 result = r * microfacet_term + (1 - r) * diffuse_term;
+	return result;
+
 }
 void main() 
 {
@@ -178,7 +183,9 @@ void main()
 		indirect_illumination_term +
 		emission_term;
 
-	fragmentColor = vec4(shading, 1.0);
+	fragmentColor = vec4(shading, 1.0f);
+	//fragmentColor = normalize(vec4(viewSpaceNormal, 0.0f));
+	//fragmentColor = normalize(normal);
 	return;
 
 }

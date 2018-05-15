@@ -53,7 +53,7 @@ GLuint waterShader;
 // Water
 ///////////////////////////////////////////////////////////////////////////////
 FboInfo reflectionFbo, refractionFbo;
-float waterYPos = 35.0f;
+float waterYPos = 20.0f;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -67,9 +67,9 @@ const std::string envmap_base_name = "001";
 // Light source
 ///////////////////////////////////////////////////////////////////////////////
 vec3 lightPosition;
-vec3 point_light_color = vec3(1.f, 1.f, 1.f);
+vec3 point_light_color = vec3(1.f, 0.5f, 1.f);
 
-float point_light_intensity_multiplier = 10000.0f;
+float point_light_intensity_multiplier = 10.0f;
 
 
 
@@ -95,6 +95,7 @@ mat4 roomModelMatrix;
 mat4 landingPadModelMatrix; 
 mat4 fighterModelMatrix;
 mat4 terrainModelMatrix;
+mat4 waterModelMatrix;
 
 void loadShaders(bool is_reload)
 {
@@ -126,11 +127,19 @@ void initGL()
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
 	sphereModel     = labhelper::loadModelFromOBJ("../scenes/sphere.obj");
 
+	float landingPadYPosition = 5.0f;
+
 	roomModelMatrix = mat4(1.0f);
-	fighterModelMatrix = translate(65.0f * worldUp);
-	landingPadModelMatrix = translate(50.0f* worldUp);
-	terrainModelMatrix = glm::scale(vec3(1000.0f, 333.0f, 1000.0f));
+
+	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
+	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
+
+	vec3 scaleFactor = vec3(300.0, 30.0, 300.0); //Use this to scale the map
+	terrainModelMatrix = glm::scale((vec3(1.0f, 3.33f, 1.0f)*scaleFactor));
+	waterModelMatrix = translate(waterYPos * worldUp);
+
 	terrain.generateMesh(262144);
+
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
 	///////////////////////////////////////////////////////////////////////
@@ -144,8 +153,12 @@ void initGL()
 	irradianceMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + "_irradiance.hdr");
 
 	//Load terrain textures
-	terrain.loadHeightField("../scenes/nlsFinland/L3123F.png");
-	terrain.loadDiffuseTexture("../scenes/nlsFinland/L3123F_downscaled.jpg");
+	std::string heightFieldFilePath = "../res/land_with_pond.png";
+	std::string heightFieldTexture = "../res/wildgrass.png";
+	std::string heightFieldNormals = "../res/NormalMap.png";
+	terrain.loadHeightField(heightFieldFilePath);
+	terrain.loadDiffuseTexture(heightFieldTexture);
+	terrain.loadNormalMap(heightFieldNormals);
 
 	///////////////////////////////////////////////////////////////////////
 	// Setup water FBOs
@@ -182,10 +195,11 @@ void drawBackground(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 
 void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix, const glm::vec4 clipPlane)
 {
+	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
+
 	glUseProgram(currentShaderProgram);
 	labhelper::setUniformSlow(currentShaderProgram, "clippingPlane", clipPlane);
 	// Light source
-	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
 	labhelper::setUniformSlow(currentShaderProgram, "point_light_color", point_light_color);
 	labhelper::setUniformSlow(currentShaderProgram, "point_light_intensity_multiplier", point_light_intensity_multiplier);
 	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
@@ -198,13 +212,14 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	// camera
 	labhelper::setUniformSlow(currentShaderProgram, "viewInverse", inverse(viewMatrix));
 
+	/*
 	// landing pad 
 	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
 
-	labhelper::render(landingpadModel);
+	labhelper::render(landingpadModel); */
 
 	// Fighter
 	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
@@ -220,7 +235,7 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	glUseProgram(waterShader);
-	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * translate(waterYPos * worldUp));
+	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * waterModelMatrix);
 	glActiveTexture(GL_TEXTURE9);
 	glBindTexture(GL_TEXTURE_2D, reflectionFbo.colorTextureTargets[0]);
 	glActiveTexture(GL_TEXTURE10);
@@ -293,13 +308,46 @@ void drawQuad(float width, float height)
 	
 }
 
+void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm::vec4 clipPlane)
+{
+	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
+	//Land + Heightfield
+	glUseProgram(heightShader);
+	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
+	labhelper::setUniformSlow(heightShader, "clippingPlane", clipPlane);
+	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
+	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
+	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
+	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
+	// Environment
+	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 3);
+
+	// camera
+	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
+	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 0);
+	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
+	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
+	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
+	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
+	//material
+	labhelper::setUniformSlow(heightShader, "material_reflectivity", .01f);
+	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_emission", 1.0f);
+	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
+	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
+	terrain.submitTriangles();
+}
+
 ///////////////////////////////////////////////////////////////////////////
 // Draws everything that does not require multiple passes
 ///////////////////////////////////////////////////////////////////////////
 void drawSinglePassScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix, const glm::vec4 clipPlane)
 {
 	drawBackground(viewMatrix, projectionMatrix);
-	drawScene(shaderProgram, viewMatrix, projectionMatrix, lightViewMatrix, lightProjectionMatrix, vec4(0));
+	drawScene(shaderProgram, viewMatrix, projectionMatrix, lightViewMatrix, lightProjectionMatrix, clipPlane);
+	drawTerrain(viewMatrix, projectionMatrix, clipPlane);
 	debugDrawLight(viewMatrix, projectionMatrix, vec3(lightPosition));
 }
 
@@ -318,13 +366,14 @@ void display(void)
 	}
 
 	///////////////////////////////////////////////////////////////////////////
-	// setup matrices
+	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
 	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
-	vec4 lightStartPosition = vec4(40.0f, 40.0f, 0.0f, 1.0f);
-	lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
+	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);
+	//lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
+	lightPosition = lightStartPosition;
 	mat4 lightViewMatrix = lookAt(lightPosition, vec3(0.0f), worldUp);
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
 
@@ -346,12 +395,11 @@ void display(void)
 	glViewport(0, 0, reflectionFbo.width, reflectionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//distance to move camera to move "below" water
-	float distance = 2 * cameraPosition.y;  //Assuming water is on 0
-	vec3 reflectionCameraPosition = cameraPosition + worldUp * distance;
-	mat4 pitch = rotate(cameraDirection.y, normalize(cross(cameraDirection, worldUp)));
-	vec3 reflectCameraDirection = vec3(pitch * vec4(cameraDirection, 0.0f));
-	mat4 reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + reflectCameraDirection, worldUp);
-	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -60));
+	float distanceToMove = 2 * (cameraPosition.y - waterYPos);  //Assuming water is on 0
+	vec3 reflectionCameraPosition = cameraPosition - worldUp * distanceToMove;
+	//Look at the inversed y direction (inverse pitch)
+	mat4 reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + vec3(cameraDirection.x, -cameraDirection.y, cameraDirection.z), worldUp);
+	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -waterYPos));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw below water for refraction
@@ -359,7 +407,7 @@ void display(void)
 	glBindFramebuffer(GL_FRAMEBUFFER, refractionFbo.framebufferId);
 	glViewport(0, 0, refractionFbo.width, refractionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, 60));
+	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, waterYPos));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera
@@ -374,29 +422,13 @@ void display(void)
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
 	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));*/
 
-	glUseProgram(heightShader);
-	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
-	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
-	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
-	// Environment
-	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier*3);
-
-	// camera
-	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
-	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projMatrix * viewMatrix * terrainModelMatrix);
-	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
-	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "normalMatrix", inverse(transpose(viewMatrix * terrainModelMatrix)));
-	terrain.submitTriangles();
 	
 	drawWater(viewMatrix, projMatrix);
 	//drawQuad(0.5f, 0.5f);
 
 
 } 
+
 
 
 bool handleEvents(void)

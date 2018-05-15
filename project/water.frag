@@ -4,7 +4,7 @@
 precision highp float;
 
 //uniform vec3 material_color;
-in vec2 texCoords;
+in vec4 clipSpaceCoords;
 
 layout(location = 0) out vec4 fragmentColor;
 
@@ -13,7 +13,10 @@ layout(binding = 10) uniform sampler2D refractionTexture;
 
 void main()
 {
-	vec4 reflectionColor = texture2D(reflectionTexture, texCoords);
-	vec4 refractionColor = texture2D(refractionTexture, texCoords);
-	fragmentColor = mix(reflectionColor, refractionColor, 0.5);
+	vec2 normalizedDeviceSpaceCoords = (clipSpaceCoords.xy/clipSpaceCoords.w)/2 + 0.5f;	//Screen space, convert from (-1,1) interval to (0,1)
+	vec4 reflectionColor = texture2D(reflectionTexture, vec2(normalizedDeviceSpaceCoords.x, -normalizedDeviceSpaceCoords.y));
+	vec4 refractionColor = texture2D(refractionTexture, vec2(normalizedDeviceSpaceCoords.x, normalizedDeviceSpaceCoords.y));
+	fragmentColor = mix(reflectionColor, refractionColor, 0.3);
+	//fragmentColor = refractionColor;
+	//fragmentColor = reflectionColor;
 }
