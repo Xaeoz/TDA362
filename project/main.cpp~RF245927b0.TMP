@@ -237,8 +237,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 
 void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
-	water.m_moveFactor += WAVE_SPEED;
-	if (water.m_moveFactor >= 1.0f) water.m_moveFactor = 0;			//Reset counter if it passes 1.0f
 	glUseProgram(waterShader);
 	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * water.m_modelMatrix);
 	labhelper::setUniformSlow(waterShader, "moveFactor", water.m_moveFactor);
@@ -338,7 +336,7 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 2000.0f);
+	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
 	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);

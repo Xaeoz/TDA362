@@ -92,6 +92,7 @@ mat4 roomModelMatrix;
 mat4 landingPadModelMatrix; 
 mat4 fighterModelMatrix;
 mat4 terrainModelMatrix;
+mat4 waterModelMatrix;
 
 void loadShaders(bool is_reload)
 {
@@ -137,17 +138,16 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
-	float waterYPos = 10.0f;
+	const float waterYPos = 10.0f;
 
 	//Reflection map resolution (higher is better and slower)
-	float reflectionX = 1280;
+	const float reflectionX = 1280;
 	const float reflectionY = 720;
 
 	//Refraction map resolution (higher is better and slower)
 	const float refractionX = 1280;
 	const float refractionY = 720;
-
-	water.init(waterYPos*worldUp, 100.0f, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
+	water.init(waterYPos*worldUp, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -237,11 +237,8 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 
 void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
-	water.m_moveFactor += WAVE_SPEED;
-	if (water.m_moveFactor >= 1.0f) water.m_moveFactor = 0;			//Reset counter if it passes 1.0f
 	glUseProgram(waterShader);
-	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * water.m_modelMatrix);
-	labhelper::setUniformSlow(waterShader, "moveFactor", water.m_moveFactor);
+	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * waterModelMatrix);
 	//Binds necessary textures, VAO, and index buffer
 	water.render();
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -338,7 +335,7 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 2000.0f);
+	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
 	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);
