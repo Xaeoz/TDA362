@@ -94,8 +94,8 @@ void HeightField::loadDiffuseTexture(const std::string &diffusePath)
 	}
 
 	glBindTexture(GL_TEXTURE_2D, m_texid_diffuse);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
@@ -161,6 +161,24 @@ void HeightField::generateMesh(int tesselation)
 		v -= (1.0f / float(verticesPerRow - 1));
 	}
 
+	//Generate tile texcoords
+	float* tileTexCoords = NULL;
+	tileTexCoords = new float[verticesPerRow*verticesPerRow * 2];
+	float vt = 16.0f;
+	idx = 0;
+	for (int jt = 0; jt < verticesPerRow; jt++) {
+		float ut = 0;
+		for (int kt = 0; kt < verticesPerRow; kt++) {
+			tileTexCoords[idx++] = ut;
+			tileTexCoords[idx++] = vt;
+			ut += (16.0f / float(verticesPerRow - 1));
+			//printf("texCoord: %i,%i \n", jt, kt);
+			//printf("ut: %f, \n vt: %f \n", tileTexCoords[idx - 2], tileTexCoords[idx - 1]);
+		}
+		//printf("V Dec before: %f \n", v);
+		vt -= (16.0f / float(verticesPerRow - 1));
+	}
+
 
 	//Generate indices
 
@@ -210,7 +228,7 @@ void HeightField::generateMesh(int tesselation)
 
 	glGenBuffers(1, &m_uvBuffer);													// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ARRAY_BUFFER, m_uvBuffer);									// Set the newly created buffer as the current one
-	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), texCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), tileTexCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
 	glVertexAttribPointer(2, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
 	glEnableVertexAttribArray(2);
 
@@ -220,11 +238,11 @@ void HeightField::generateMesh(int tesselation)
 	glVertexAttribPointer(3, 1, GL_INT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
 	glEnableVertexAttribArray(3);
 
-	//glGenBuffers(1, &m_normalBuffer);													// Create a handle for the vertex position buffer
-	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_normalBuffer);									// Set the newly created buffer as the current one
-	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), texCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
-	//glVertexAttribPointer(4, 1, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
-	//glEnableVertexAttribArray(4);
+	glGenBuffers(1, &m_normalBuffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_normalBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), texCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(4, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(4);
 
 
 }

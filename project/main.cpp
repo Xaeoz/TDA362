@@ -21,7 +21,10 @@ using namespace glm;
 #include <Model.h>
 #include "hdr.h"
 #include "fbo.h"
+#include "HeightGenerator.h"
 #include "heightfield.h"
+#include "terrain.h"
+
 
 
 
@@ -38,7 +41,13 @@ float previousTime = 0.0f;
 float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
-HeightField terrain;
+
+//int tesselation = 262144;
+int size = 1000;
+int tesselation = ((size/6)*2)*((size/6)*2);
+HeightGenerator heightGenerator;
+Terrain terrain(tesselation, heightGenerator);
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
@@ -56,6 +65,7 @@ float environment_multiplier = 1.0f;
 GLuint environmentMap, irradianceMap, reflectionMap;
 const std::string envmap_base_name = "001";
 
+
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
 ///////////////////////////////////////////////////////////////////////////////
@@ -71,9 +81,9 @@ float point_light_intensity_multiplier = 10.0f;
 ///////////////////////////////////////////////////////////////////////////////
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
-vec3 cameraPosition(-70.0f, 50.0f, 70.0f);
+vec3 cameraPosition(-270.0f, 300.0f, 70.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-float cameraSpeed = 1.0f;
+float cameraSpeed = 10.0f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -126,10 +136,10 @@ void initGL()
 	roomModelMatrix = mat4(1.0f);
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
-	vec3 scaleFactor = vec3(300.0, 30.0, 300.0); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 3.33f, 1.0f)*scaleFactor));
+	vec3 scaleFactor = vec3(size, 1, size); //Use this to scale the map
+	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -2.0f, -1.0f));
 	waterModelMatrix = translate(waterYPosition * worldUp);
-	terrain.generateMesh(262144);
+	terrain.initTerrain();
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -147,13 +157,13 @@ void initGL()
 	std::string heightFieldFilePath = "../res/land_with_pond.png";
 	std::string heightFieldTexture = "../res/wildgrass.png";
 	std::string heightFieldNormals = "../res/NormalMap.png";
-	terrain.loadHeightField(heightFieldFilePath);
-	terrain.loadDiffuseTexture(heightFieldTexture);
-	terrain.loadNormalMap(heightFieldNormals);
+	//terrain.loadHeightField(heightFieldFilePath);
+	//terrain.loadDiffuseTexture(heightFieldTexture);
+	//terrain.loadNormalMap(heightFieldNormals);
 
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
-	glEnable(GL_CULL_FACE);		// enables backface culling
+	//glEnable(GL_CULL_FACE);		// enables backface culling
 
 
 }
@@ -203,7 +213,7 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_emission", 1.0f);
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
+	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 0);
 	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
 	terrain.submitTriangles();
 	glUseProgram(currentShaderProgram);
@@ -296,7 +306,7 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
-	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
+	mat4 projMatrix = perspective(radians(80.0f), float(windowWidth) / float(windowHeight), 5.0f, 4000.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
 	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);
@@ -406,6 +416,7 @@ int main(int argc, char *argv[])
 
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
+	
 
 	while (!stopRendering) {
 		//update currentTime

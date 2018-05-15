@@ -186,6 +186,7 @@ void main()
 	fragmentColor = vec4(shading, 1.0f);
 	//fragmentColor = normalize(vec4(viewSpaceNormal, 0.0f));
 	//fragmentColor = normalize(normal);
+	//fragmentColor = vec4(texCoord, 0.0, 1.0f);
 	return;
 
 }
