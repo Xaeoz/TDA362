@@ -25,7 +25,7 @@ out vec3 viewSpaceNormal;
 
 void main() 
 {
-	gl_ClipDistance[0] = dot(modelMatrix*vec4(position, 1), clippingPlane);
+
 	normal = normalize(texture2D(heightNormals, texCoordIn));
 	//float stepLength = 0.001;
 	//vec3 point1 = vec3(position.x, texture2D(heightMap, vec2(texCoordIn.x, texCoordIn.y)).x, position.z);
@@ -40,7 +40,7 @@ void main()
 	gl_Position = modelViewProjectionMatrix * vec4(position.x, 0-texture2D(heightMap, texCoordIn.xy).x, position.z, 1.0f);
 	viewSpacePosition = (modelViewMatrix * vec4(position.x, 0-texture2D(heightMap, texCoordIn.xy).x, position.z, 1.0f)).xyz;
 	//viewSpacePosition = (modelViewMatrix * vec4(position.x, position.x, position.z, 1.0f)).xyz;
-
+	gl_ClipDistance[0] = dot(modelMatrix*vec4(position.x, 0-texture2D(heightMap, texCoordIn.xy).x, position.z, 1.0f), clippingPlane);
 	texCoord = texCoordIn;
 }
 

@@ -8,15 +8,18 @@
 class Water {
 public:
 	GLuint m_texid_dudv;
+	GLuint m_texid_normalMap;
 	GLuint m_vao;
 	GLuint m_positionBuffer;
 	GLuint m_indexBuffer;
 	FboInfo m_reflectionFbo;
 	FboInfo m_refractionFbo;
+	
 	glm::mat4 m_modelMatrix;
 	float m_moveFactor;
 
-#define WAVE_SPEED 0.001f
+	//Defines the how fast the distortions move
+	#define WAVE_SPEED 0.0008f		
 
 	Water(void);
 

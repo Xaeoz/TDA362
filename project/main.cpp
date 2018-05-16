@@ -38,6 +38,12 @@ bool showUI = false;
 int windowWidth, windowHeight;
 HeightField terrain;
 
+//TODO: Remove this in favour of utilizing illumination map in the shaders
+//Global Light (the sun)
+vec3 globalLightPosition = vec3(0, 100, -1000);				//Position of the imaginary "sun"
+vec3 globalLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);		//Color of the light it is emitting
+vec3 globalLightDirection = normalize(vec3(2500, -100, 10000));		//Direction of the global light
+
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
@@ -75,7 +81,7 @@ float point_light_intensity_multiplier = 10.0f;
 ///////////////////////////////////////////////////////////////////////////////
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
-vec3 cameraPosition(-70.0f, 50.0f, 70.0f);
+vec3 cameraPosition(0.0f, 50.0f, 70.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
 float cameraSpeed = 1.0f;
 
@@ -137,17 +143,18 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
-	float waterYPos = 10.0f;
+	const float waterYPos = -20.0f;
+	const float waterSize = 500.0f;
 
 	//Reflection map resolution (higher is better and slower)
-	float reflectionX = 1280;
+	const float reflectionX = 1280;
 	const float reflectionY = 720;
 
 	//Refraction map resolution (higher is better and slower)
 	const float refractionX = 1280;
 	const float refractionY = 720;
 
-	water.init(waterYPos*worldUp, 100.0f, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
+	water.init(waterYPos*worldUp, waterSize, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -239,12 +246,28 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	water.m_moveFactor += WAVE_SPEED;
 	if (water.m_moveFactor >= 1.0f) water.m_moveFactor = 0;			//Reset counter if it passes 1.0f
+	//Set active shader program
 	glUseProgram(waterShader);
+
+	glEnable(GL_BLEND);			//Enable alpha blending (used to smooth out water edges)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	//Setup data in shaders, for information on each field, refer to the shader
 	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * water.m_modelMatrix);
 	labhelper::setUniformSlow(waterShader, "moveFactor", water.m_moveFactor);
-	//Binds necessary textures, VAO, and index buffer
+	labhelper::setUniformSlow(waterShader, "cameraPosition", cameraPosition);
+	labhelper::setUniformSlow(waterShader, "modelMatrix", water.m_modelMatrix);
+	labhelper::setUniformSlow(waterShader, "globalLightPosition", globalLightPosition);
+	labhelper::setUniformSlow(waterShader, "globalLightColor", globalLightColor);
+	labhelper::setUniformSlow(waterShader, "globalLightDirection", globalLightDirection);
+	//These need to match the near and far plane of the current projection matrix
+	labhelper::setUniformSlow(waterShader, "nearPlane", 1.0f);
+	labhelper::setUniformSlow(waterShader, "farPlane", 2000.0f);
+	//Binds necessary textures, VAO, and index buffer, and then calls drawElements
 	water.render();
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	
+	glDisable(GL_BLEND);											//Disable blend again after rendering
 }
 
 void drawQuad(float width, float height)
@@ -371,8 +394,8 @@ void display(void)
 
 	//Look at the inversed y direction (inverse pitch)
 	mat4 reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + vec3(cameraDirection.x, -cameraDirection.y, cameraDirection.z), worldUp);
-
-	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -water.m_modelMatrix[3].y));
+	float renderPassOffset = 1.0f;
+	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -water.m_modelMatrix[3].y +1.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw below water for refraction
@@ -380,7 +403,8 @@ void display(void)
 	glBindFramebuffer(GL_FRAMEBUFFER, water.m_refractionFbo.framebufferId);
 	glViewport(0, 0, water.m_refractionFbo.width, water.m_refractionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y));
+	//Offset the clipping plane slightly above the water to avoid black artefact lines along intersections with shallow terrain
+	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y+1));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera
@@ -391,9 +415,6 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
-	/*drawBackground(viewMatrix, projMatrix);
-	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
-	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));*/
 
 	
 	drawWater(viewMatrix, projMatrix);

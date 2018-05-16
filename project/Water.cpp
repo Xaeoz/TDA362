@@ -12,12 +12,13 @@ using std::vector;
 
 Water::Water()
 	:
-	m_texid_dudv(UINT32_MAX)
+	  m_texid_dudv(UINT32_MAX)
+	, m_texid_normalMap(UINT32_MAX)
 	, m_vao(UINT32_MAX)
 	, m_positionBuffer(UINT32_MAX)
 	, m_indexBuffer(UINT32_MAX)
 	, m_modelMatrix()
-	, m_moveFactor(0)
+	, m_moveFactor(0) 
 {
 }
 
@@ -31,23 +32,53 @@ void Water::init(vec3 &position, float scale, vec2 &reflectionMapRes, vec2 &refr
 	generateMesh();
 
 	//Load textures
-	int width, height, components;
+	int width, height, components;				//Not reference based, so no problem re-using for all textures
+
+
+	//DuDv texture (aka. Distortion map)
 	std::string dudvPath = "../res/waterDUDV.png";
-	float *data = stbi_loadf(dudvPath.c_str(), &width, &height, &components, 1);
-	if (data == nullptr) {
+	float *dudvData = stbi_loadf(dudvPath.c_str(), &width, &height, &components, 3);
+	if (dudvData == nullptr) {
 		std::cout << "Failed to load image: " << dudvPath << ".\n";
-		return;
+		return;		//Not handled, this will cause the water component to break when used
 	}
 	if (m_texid_dudv == UINT32_MAX) {
 		glGenTextures(1, &m_texid_dudv);
 	}
+
+	//Set texture to modify
 	glBindTexture(GL_TEXTURE_2D, m_texid_dudv);
+	//Repeat to allow distortions and such to loop around the texture
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	//Not a visible texture per say, so linear works well enough
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, dudvData);
+
+	//Load in normalMap data from file
+	std::string nMapPath = "../res/matchingNormalMap.png";
+	float *nMapdata = stbi_loadf(nMapPath.c_str(), &width, &height, &components, 3);
+	if (nMapdata == nullptr) {
+		std::cout << "Failed to load image: " << nMapPath << ".\n";
+		return;		//Not handled, this will cause the water component to break when used
+	}
+	//Get a GLuint reference for the texture if one is not already present
+	if (m_texid_normalMap == UINT32_MAX) {
+		glGenTextures(1, &m_texid_normalMap);
+	}
+	//Set texture to modify
+	glBindTexture(GL_TEXTURE_2D, m_texid_normalMap);
+	//Repeat to allow distortions and such to loop around the texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	//Not a visible texture per say, so linear works well enough
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, nMapdata);
+
 }
 
 
@@ -87,13 +118,31 @@ void Water::generateMesh()
 
 void Water::render()
 {
+	//Bind mesh data
 	glBindVertexArray(m_vao);
+	//Bind indices data
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);
+
+	//Bind textures to the references specified in the shader
+
+	//Reflection texture
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, m_reflectionFbo.colorTextureTargets[0]);
+
+	//Refraction texture
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, m_refractionFbo.colorTextureTargets[0]);
+
+	//DuDv (Distortion) map
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, m_texid_dudv);
+
+	//Normal Map
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, m_texid_normalMap);
+
+	//Depth Map
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, m_refractionFbo.depthBuffer);					//Refraction buffer contains everything below water, which can be used to find the depth of the water
 
 }
