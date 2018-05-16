@@ -41,11 +41,13 @@ float previousTime = 0.0f;
 float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
+int octaves = 4;
+float scalingBias = 2.0f;
 
 //int tesselation = 262144;
-int size = 1000;
+int size = 2048;
 int tesselation = ((size/6)*2)*((size/6)*2);
-HeightGenerator heightGenerator;
+HeightGenerator heightGenerator(tesselation);
 Terrain terrain(tesselation, heightGenerator);
 
 
@@ -144,7 +146,7 @@ void initGL()
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
 	vec3 scaleFactor = vec3(size, 1, size); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -2.0f, -1.0f));
+	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, 0.0f, -1.0f));
 	waterModelMatrix = translate(waterYPosition * worldUp);
 	terrain.initTerrain();
 
@@ -409,8 +411,6 @@ void display(void)
 
 } 
 
-
-
 bool handleEvents(void)
 {
 	// check events (keyboard among other)
@@ -444,6 +444,7 @@ bool handleEvents(void)
 	const uint8_t *state = SDL_GetKeyboardState(nullptr);
 	vec3 cameraRight = cross(cameraDirection, worldUp);
 
+
 	if (state[SDL_SCANCODE_W]) {
 		cameraPosition += cameraSpeed* cameraDirection;
 	}
@@ -461,6 +462,29 @@ bool handleEvents(void)
 	}
 	if (state[SDL_SCANCODE_E]) {
 		cameraPosition += cameraSpeed * worldUp;
+	}
+	if (state[SDL_SCANCODE_P]) {
+		terrain.initTerrain();
+	}
+	if (state[SDL_SCANCODE_Z]) {
+		if(octaves > 2) octaves -= 2;
+		printf("Octaves: %i \n", octaves);
+		terrain.updateTerrain(octaves, scalingBias);
+	}
+	if (state[SDL_SCANCODE_X]) {
+		if (octaves < 20) octaves += 2;
+		printf("Octaves: %i \n", octaves);
+		terrain.updateTerrain(octaves, scalingBias);
+	}
+	if (state[SDL_SCANCODE_C]) {
+		if (scalingBias > 0.2f) scalingBias -= 0.2f;
+		printf("bias: %f \n", scalingBias);
+		terrain.updateTerrain(octaves, scalingBias);
+	}
+	if (state[SDL_SCANCODE_V]) {
+		if (scalingBias < 4.0f) scalingBias += 0.2f;
+		printf("bias: %f \n", scalingBias);
+		terrain.updateTerrain(octaves, scalingBias);
 	}
 	return quitEvent;
 }

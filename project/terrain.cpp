@@ -28,11 +28,16 @@ Terrain::Terrain(int tesselation, HeightGenerator generator)
 	triangleRestartIndex = 9999999;
 }
 
-float* Terrain::generateVertices(void)
+float* Terrain::generateVertices(int octaves, float scalingBias)
 {
+
 	float* verts = NULL;
 	float vertexDistance = 2.0f / float(verticesPerRow - 1);
-	verts = new float[verticesPerRow*verticesPerRow * 3];
+	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
+	verts = new float[nrOfVertices];
+
+	float * perlinNoise = new float[nrOfVertices/3];
+	generator.generatePerlinNoise(nrOfVertices/3, octaves, scalingBias, perlinNoise);
 
 	float z = 2;
 	int idx = 0;
@@ -40,7 +45,8 @@ float* Terrain::generateVertices(void)
 		float x = 0;
 		for (int k = 0; k < verticesPerRow; k++) {
 			verts[idx++] = x;
-			verts[idx++] = generator.generateHeight(x/64.0f, z/64.0f, vertexDistance);
+			//verts[idx++] = generator.generateHeight(x/64.0f, z/64.0f, vertexDistance);
+			verts[idx++] = perlinNoise[j*verticesPerRow + k] *600;
 			verts[idx++] = z;
 			x += vertexDistance;
 		}
@@ -92,9 +98,40 @@ int* Terrain::generateIndices(void) {
 	return indices;
 }
 
-void Terrain::initTerrain(void) {
+void Terrain::updateTerrain(int octaves, float scalingBias)
+{
+	float * verts = generateVertices(octaves, scalingBias);
 	int * indices = generateIndices();
-	float * verts = generateVertices();
+	float * tileTexCoords = generateTileTexCoords(16);
+
+	printf("Updated terrain \n");
+	glGenVertexArrays(1, &m_vao);
+	glBindVertexArray(m_vao);
+	// Create a handle for the vertex position buffer
+	glGenBuffers(1, &m_positionBuffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_positionBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), verts, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(0, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(0);
+
+	glGenBuffers(1, &m_uvBuffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_uvBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), tileTexCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(2, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(2);
+
+	glGenBuffers(1, &m_indexBuffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_numIndices * sizeof(int), indices, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+																									//glVertexAttribPointer(3, 1, GL_INT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+																									//glEnableVertexAttribArray(3);
+
+}
+
+void Terrain::initTerrain(void) {
+	generator.generateSeedArray(tesselation);
+	int * indices = generateIndices();
+	float * verts = generateVertices(4, .6f);
 	float * tileTexCoords = generateTileTexCoords(16);
 
 	printf("Vertices Per Row: %i \n", verticesPerRow);

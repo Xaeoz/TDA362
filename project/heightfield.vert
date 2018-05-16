@@ -22,6 +22,7 @@ out vec2 texCoord;
 out vec4 normal;
 out vec3 viewSpacePosition;
 out vec3 viewSpaceNormal;
+out vec3 positionOut;
 
 void main() 
 {
@@ -37,10 +38,10 @@ void main()
 	//viewSpaceNormal = vec3(0.0f, 1.0f, 0.0f);
 	//viewSpaceNormal = normalize(viewSpaceNormal);
 	//gl_Position = modelViewProjectionMatrix * vec4(position.x, 0-texture2D(heightMap, normalTexCoord.xy).x, position.z, 1.0f);
-	gl_Position = modelViewProjectionMatrix * vec4(position, 1.0f);
+	gl_Position = modelViewProjectionMatrix * vec4(position.x, position.y, position.z, 1.0f);
 	viewSpacePosition = (modelViewMatrix * vec4(position.x, 0-texture2D(heightMap, normalTexCoord.xy).x, position.z, 1.0f)).xyz;
 	//viewSpacePosition = (modelViewMatrix * vec4(position.x, position.x, position.z, 1.0f)).xyz;
-
+	positionOut = position;
 	texCoord = texCoordIn;
 }
 

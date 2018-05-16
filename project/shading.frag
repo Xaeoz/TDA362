@@ -47,6 +47,7 @@ in vec2 texCoord;
 in vec3 viewSpaceNormal;
 in vec3 viewSpacePosition;
 in vec4 normal;
+in vec3 positionOut;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Input uniform variables
@@ -152,6 +153,7 @@ vec3 calculateIndirectIllumination(vec3 wo, vec3 n)
 	return result;
 
 }
+
 void main() 
 {
 	float visibility = 1.0;
@@ -183,10 +185,13 @@ void main()
 		indirect_illumination_term +
 		emission_term;
 
-	fragmentColor = vec4(shading, 1.0f);
+	//fragmentColor = vec4(shading, 1.0f);
+	vec3 pos = positionOut/600 + vec3(0.0, 0.5, 0.0);
+	fragmentColor = vec4(0, pos.y, 1-pos.y, 1.0);
 	//fragmentColor = normalize(vec4(viewSpaceNormal, 0.0f));
 	//fragmentColor = normalize(normal);
 	//fragmentColor = vec4(texCoord, 0.0, 1.0f);
+	//fragmentColor = vec4(vec3(positionOut.y), 1.0);
 	return;
 
 }

@@ -18,12 +18,14 @@ public:
 
 	Terrain(int tesselation, HeightGenerator generator);
 
-	float * generateVertices(void);
+	float * generateVertices(int octaves, float scalingBias);
 
 
 	float * generateTileTexCoords(int nrOfTiles);
 
 	int * generateIndices(void);
+
+	void updateTerrain(int octaves, float scalingBias);
 
 	void initTerrain(void);
 
