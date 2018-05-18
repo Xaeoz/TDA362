@@ -17,6 +17,8 @@ add_executable ( project
     hdr.cpp
     heightfield.cpp
     ParticleSystem.cpp
+    Water.cpp
+    terrain.cpp
     ${SHADERS}
     )
 
