@@ -150,7 +150,6 @@ void initGL()
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
 	vec3 scaleFactor = vec3(size*3, 100, size*3); //Use this to scale the map
 	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -0.50f, -1.0f));
-	waterModelMatrix = translate(waterYPosition * worldUp);
 	terrain.initTerrain(octaves, scalingBias);
 
 
@@ -224,30 +223,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 {
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
 
-	/*//Land + Heightfield
-	glUseProgram(heightShader);
-	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
-	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
-	// Environment
-	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 1);
-
-	// camera
-	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
-	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
-	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
-	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
-	//material
-	labhelper::setUniformSlow(heightShader, "material_reflectivity", .1f);
-	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_emission", .5f);
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
-	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
-	terrain.submitTriangles();*/
 
 	glUseProgram(currentShaderProgram);
 	labhelper::setUniformSlow(currentShaderProgram, "clippingPlane", clipPlane);
@@ -345,30 +320,29 @@ void drawQuad(float width, float height)
 void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm::vec4 clipPlane)
 {
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
-	//Land + Heightfield
+	
 	glUseProgram(heightShader);
-	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "clippingPlane", clipPlane);
 	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
 	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
+	
 	// Environment
-	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 3);
+	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 1);
 
 	// camera
 	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 0);
 	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
 	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
 	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
+	
 	//material
-	labhelper::setUniformSlow(heightShader, "material_reflectivity", .01f);
+	labhelper::setUniformSlow(heightShader, "material_reflectivity", .1f);
 	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_emission", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_emission", .5f);
 	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
 	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
 	terrain.submitTriangles();
@@ -460,7 +434,7 @@ void display(void)
 	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
 
 	
-	//drawWater(viewMatrix, projMatrix);
+	drawWater(viewMatrix, projMatrix);
 	//drawQuad(0.5f, 0.5f);
 
 
