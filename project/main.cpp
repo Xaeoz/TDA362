@@ -45,7 +45,7 @@ int octaves = 4;
 float scalingBias = 2.0f;
 
 //int tesselation = 262144;
-int size = 2048;
+int size = 18;
 int tesselation = ((size/6)*2)*((size/6)*2);
 HeightGenerator heightGenerator(tesselation);
 Terrain terrain(tesselation, heightGenerator);
@@ -146,7 +146,7 @@ void initGL()
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
 	vec3 scaleFactor = vec3(size, 1, size); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, 0.0f, -1.0f));
+	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -700.0f, -1.0f));
 	waterModelMatrix = translate(waterYPosition * worldUp);
 	terrain.initTerrain();
 
@@ -168,7 +168,7 @@ void initGL()
 	std::string heightFieldTexture = "../res/wildgrass.png";
 	std::string heightFieldNormals = "../res/NormalMap.png";
 	//terrain.loadHeightField(heightFieldFilePath);
-	//terrain.loadDiffuseTexture(heightFieldTexture);
+	terrain.loadDiffuseTexture(heightFieldTexture);
 	//terrain.loadNormalMap(heightFieldNormals);
 
 	///////////////////////////////////////////////////////////////////////
@@ -218,7 +218,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 
 	// camera
 	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 0);
 	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
 	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
@@ -229,7 +228,7 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_emission", 1.0f);
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 0);
+	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
 	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
 	terrain.submitTriangles();
 

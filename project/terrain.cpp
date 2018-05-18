@@ -23,6 +23,8 @@ Terrain::Terrain(int tesselation, HeightGenerator generator)
 	, m_indexBuffer(UINT32_MAX)
 	, m_numIndices(0)
 	, triangleRestartIndex(0)
+	, m_texid_diffuse(UINT32_MAX)
+	, diffuseMapPath("")
 {
 	verticesPerRow = (sqrt(tesselation / 2) + 1);
 	triangleRestartIndex = 9999999;
@@ -46,7 +48,7 @@ float* Terrain::generateVertices(int octaves, float scalingBias)
 		for (int k = 0; k < verticesPerRow; k++) {
 			verts[idx++] = x;
 			//verts[idx++] = generator.generateHeight(x/64.0f, z/64.0f, vertexDistance);
-			verts[idx++] = perlinNoise[j*verticesPerRow + k] *600;
+			verts[idx++] = perlinNoise[j*verticesPerRow + k] * 600;
 			verts[idx++] = z;
 			x += vertexDistance;
 		}
@@ -98,11 +100,70 @@ int* Terrain::generateIndices(void) {
 	return indices;
 }
 
+//Calculates normals of all triangle surfaces.
+float * Terrain::calculateSurfaceNormals(int * indices, float * verts) {
+
+	float * surfaceNormals = new float[tesselation*3];
+	int idx = 0;
+	int vertexIndex = 0;
+	int numberOfRestartIndices = sqrt(tesselation / 2) - 1;
+	for (int i = 0; i < m_numIndices - 2 - numberOfRestartIndices; i++) {
+		int offset = 0;
+		if (indices[i + offset] == triangleRestartIndex) offset++;
+		int i1 = indices[i + offset];
+		offset++;
+		if (indices[i + offset] == triangleRestartIndex) offset++;
+		int i2 = indices[i + offset];
+		offset++;
+		if (indices[i + offset] == triangleRestartIndex) offset++;
+		int i3 = indices[i + offset];
+
+		vec3 v1 = vec3(verts[i1], verts[i1 + 1], verts[i1 + 2]);
+		vec3 v2 = vec3(verts[i2*3], verts[i2*3 + 1], verts[i2*3 + 2]);
+		vec3 v3 = vec3(verts[i3*3], verts[i3*3 + 1], verts[i3*3 + 2]);
+		
+		vec3 vec1 = v2 - v1;
+		vec3 vec2 = v3 - v1;
+		vec3 normal = cross(vec2, vec1);
+
+		surfaceNormals[idx++] = normal.x;
+		surfaceNormals[idx++] = normal.y;
+		surfaceNormals[idx++] = normal.z;
+		
+	}
+
+	return surfaceNormals;
+}
+
+//Calculates vertexNormals based on all the surface normals of all adjacent triangles
+float * Terrain::calculateVertexNormals(int * indices, float * surfaceNormals)
+{
+	float * vertexNormals = new float[verticesPerRow*verticesPerRow * 3];
+	for (int i = 0; i < verticesPerRow*verticesPerRow; i++) {
+		vec3 normalSum = vec3(0);
+		for (int j = 0; j < m_numIndices; j++) {
+			if (indices[j] == i) {
+				int indexOfTriangle = j / 3;
+				int indexInTriangle = j % 3;
+				int pos = indexOfTriangle * 3;
+				normalSum += vec3(surfaceNormals[pos], surfaceNormals[pos + 1], surfaceNormals[pos + 2]);
+			}
+		}
+		vec3 normal = normalize(normalSum);
+		vertexNormals[i*3] = normal.x;
+		vertexNormals[i * 3 + 1] = normal.y;
+		vertexNormals[i * 3 + 2] = normal.z;
+	}
+	return vertexNormals;
+}
+
 void Terrain::updateTerrain(int octaves, float scalingBias)
 {
 	float * verts = generateVertices(octaves, scalingBias);
 	int * indices = generateIndices();
 	float * tileTexCoords = generateTileTexCoords(16);
+	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
+	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
 
 	printf("Updated terrain \n");
 	glGenVertexArrays(1, &m_vao);
@@ -120,6 +181,12 @@ void Terrain::updateTerrain(int octaves, float scalingBias)
 	glVertexAttribPointer(2, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
 	glEnableVertexAttribArray(2);
 
+	glGenBuffers(1, &m_vertNormalBuffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_vertNormalBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), vertexNormals, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(4, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(4);
+
 	glGenBuffers(1, &m_indexBuffer);													// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);									// Set the newly created buffer as the current one
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_numIndices * sizeof(int), indices, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
@@ -133,6 +200,8 @@ void Terrain::initTerrain(void) {
 	int * indices = generateIndices();
 	float * verts = generateVertices(4, .6f);
 	float * tileTexCoords = generateTileTexCoords(16);
+	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
+	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
 
 	printf("Vertices Per Row: %i \n", verticesPerRow);
 	printf("Number of indices: %i \n", m_numIndices);
@@ -157,6 +226,13 @@ void Terrain::initTerrain(void) {
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_numIndices * sizeof(int), indices, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
 	//glVertexAttribPointer(3, 1, GL_INT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
 	//glEnableVertexAttribArray(3);
+
+	glGenBuffers(1, &m_vertNormalBuffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_vertNormalBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), vertexNormals, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(4, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(4);
+
 }
 
 void Terrain::submitTriangles(void)
@@ -172,13 +248,48 @@ void Terrain::submitTriangles(void)
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	/*glActiveTexture(GL_TEXTURE9);
-	glBindTexture(GL_TEXTURE_2D, m_texid_hf);
+	glBindTexture(GL_TEXTURE_2D, m_texid_hf);*/
 	glActiveTexture(GL_TEXTURE20);
 	glBindTexture(GL_TEXTURE_2D, m_texid_diffuse);
-	glActiveTexture(GL_TEXTURE21);
+	/*glActiveTexture(GL_TEXTURE21);
 	glBindTexture(GL_TEXTURE_2D, m_texid_normal);*/
 
 	glDrawElements(GL_TRIANGLE_STRIP, m_numIndices, GL_UNSIGNED_INT, 0);
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glDisable(GL_PRIMITIVE_RESTART);
+}
+
+std::vector<glm::vec3> * Terrain::createVectorArray(float * normals) {
+	std::vector<glm::vec3> * vectorArray = new std::vector<glm::vec3>[verticesPerRow*verticesPerRow];
+	for (int i = 0; i < verticesPerRow*verticesPerRow; i++) {
+		vec3 normal = vec3(normals[i * 3] , normals[i * 3 + 1], normals[i * 3 + 2]);
+	}
+
+	return vectorArray;
+}
+
+void Terrain::loadDiffuseTexture(const std::string &diffusePath)
+{
+	int width, height, components;
+	stbi_set_flip_vertically_on_load(true);
+	uint8_t * data = stbi_load(diffusePath.c_str(), &width, &height, &components, 3);
+	if (data == nullptr) {
+		std::cout << "Failed to load image: " << diffusePath << ".\n";
+		return;
+	}
+
+	if (m_texid_diffuse == UINT32_MAX) {
+		glGenTextures(1, &m_texid_diffuse);
+	}
+
+	glBindTexture(GL_TEXTURE_2D, m_texid_diffuse);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data); // plain RGB
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	std::cout << "Successfully loaded diffuse texture: " << diffusePath << ".\n";
 }
