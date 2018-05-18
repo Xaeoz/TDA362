@@ -52,8 +52,8 @@ float HeightGenerator::generateNoise(int x, int z)
 {
 	//Set seed based on texCoords. We set the seed to get the same noise for the same x and z.
 	//it is important for the algorithm
-	rng.seed(x*4312432 + z*423423532 + seed);
-	float randFloat = generateRandomFloat(-1.0, 1.0);
+	rng.seed(x*95728947 + z*423423532 + seed);
+	float randFloat = generateRandomFloat(-4.0, 4.0);
 	//Generate noise between 0 and 1 from seed
 	return randFloat;
 }
@@ -93,7 +93,7 @@ float HeightGenerator::interpolate(float a, float b, float blend)
 
 void HeightGenerator::generateSeedArray(int size) {
 	seedArray = new float[size];
-	for (int i = 0; i < size; i++) seedArray[i] = (float)rand()/(float)RAND_MAX;
+	for (int i = 0; i < size; i++) seedArray[i] = generateNoise(rand(), rand());
 }
 
 void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float scalingBias, float* outputArray)
@@ -117,25 +117,20 @@ void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float scalingB
 				float blendX = (float)(i - sampleX1) / (float)pitch;
 				float blendY = (float)(j - sampleY1) / (float)pitch;
 				//interpolate
-				float interpolatedSample1 = (1.0f - blendY) * seedArray[sampleX1 * rowLength + sampleY1] + blendY * seedArray[sampleX1 * rowLength + sampleY2];
-				float interpolatedSample2 = (1.0f - blendY) * seedArray[sampleX2 * rowLength + sampleY1] + blendY * seedArray[sampleX2 * rowLength + sampleY2];
+				//float interpolatedSample1 = (1.0f - blendY) * seedArray[sampleX1 * rowLength + sampleY1] + blendY * seedArray[sampleX1 * rowLength + sampleY2];
+				//float interpolatedSample2 = (1.0f - blendY) * seedArray[sampleX2 * rowLength + sampleY1] + blendY * seedArray[sampleX2 * rowLength + sampleY2];
+				float interpolatedSample1 = interpolate(seedArray[sampleX1 * rowLength + sampleY1], seedArray[sampleX1 * rowLength + sampleY2], blendY);
+				float interpolatedSample2 = interpolate(seedArray[sampleX2 * rowLength + sampleY1], seedArray[sampleX2 * rowLength + sampleY2], blendY);
 				//Accumulate noise
 				noise += (blendX * (interpolatedSample2 - interpolatedSample1) + interpolatedSample1) * scale;
-				//noise += interpolate(interpolatedSample1, interpolatedSample2, blendY);
-				//noise = interpolatedSample2;
+				//noise += (interpolatedSample1, interpolatedSample2, blendX) * scale;
 				//Accumulate scale
 				scaleAcc += scale;
 				//Half the scale
 				scale = scale / scalingBias;
-
-				/*printf("x1 * rl + y1: %i \n", sampleX1 * rowLength + sampleY1);
-				printf("x2 * rl + y1: %i \n", sampleX2 * rowLength + sampleY1);
-				printf("x1 * rl + y2: %i \n", sampleX1 * rowLength + sampleY2);
-				printf("x2 * rl + y2: %i \n", sampleX2 * rowLength + sampleY2);*/
 			}
 
 			outputArray[i * rowLength + j] = noise / scaleAcc; 
-			//outputArray[i * rowLength + j] = noise / scale;
 		}
 	}
 }

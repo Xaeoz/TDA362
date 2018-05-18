@@ -42,11 +42,12 @@ float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
 int octaves = 4;
-float scalingBias = 2.0f;
+float scalingBias = 0.6f;
 
 //int tesselation = 262144;
-int size = 18;
+int size = 400;
 int tesselation = ((size/6)*2)*((size/6)*2);
+//int tesselation = 2000;
 HeightGenerator heightGenerator(tesselation);
 Terrain terrain(tesselation, heightGenerator);
 
@@ -69,7 +70,7 @@ FboInfo reflectionFbo, refractionFbo;
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
 ///////////////////////////////////////////////////////////////////////////////
-float environment_multiplier = 1.0f;
+float environment_multiplier = 2.0f;
 GLuint environmentMap, irradianceMap, reflectionMap;
 const std::string envmap_base_name = "001";
 
@@ -78,9 +79,9 @@ const std::string envmap_base_name = "001";
 // Light source
 ///////////////////////////////////////////////////////////////////////////////
 vec3 lightPosition;
-vec3 point_light_color = vec3(1.f, 0.5f, 1.f);
+vec3 point_light_color = vec3(1.f, 1.0f, 1.f);
 
-float point_light_intensity_multiplier = 10.0f;
+float point_light_intensity_multiplier = 100.0f;
 
 
 
@@ -145,10 +146,10 @@ void initGL()
 
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
-	vec3 scaleFactor = vec3(size, 1, size); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -700.0f, -1.0f));
+	vec3 scaleFactor = vec3(size*3, 100, size*3); //Use this to scale the map
+	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -0.50f, -1.0f));
 	waterModelMatrix = translate(waterYPosition * worldUp);
-	terrain.initTerrain();
+	terrain.initTerrain(octaves, scalingBias);
 
 
 	///////////////////////////////////////////////////////////////////////
@@ -214,7 +215,7 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
 	// Environment
-	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 3);
+	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 1);
 
 	// camera
 	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
@@ -223,11 +224,11 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
 	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
 	//material
-	labhelper::setUniformSlow(heightShader, "material_reflectivity", .01f);
+	labhelper::setUniformSlow(heightShader, "material_reflectivity", .1f);
 	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
 	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_emission", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_emission", .5f);
 	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
 	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
 	terrain.submitTriangles();
@@ -248,21 +249,21 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	// camera
 	labhelper::setUniformSlow(currentShaderProgram, "viewInverse", inverse(viewMatrix));
 
-	// landing pad 
-	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
-	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
-	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
-	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
+	//// landing pad 
+	//labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
+	//labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
+	//labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
+	//labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
 
-	labhelper::render(landingpadModel);
+	//labhelper::render(landingpadModel);
 
-	// Fighter
-	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
-	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
-	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
-	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
+	//// Fighter
+	//labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
+	//labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
+	//labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
+	//labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
 
-	labhelper::render(fighterModel);
+	//labhelper::render(fighterModel);
 	
 	
 }
@@ -360,8 +361,8 @@ void display(void)
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
 	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);
-	//lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
-	lightPosition = lightStartPosition;
+	lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
+	//lightPosition = lightStartPosition;
 	mat4 lightViewMatrix = lookAt(lightPosition, vec3(0.0f), worldUp);
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
 
@@ -404,7 +405,7 @@ void display(void)
 	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
 	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));
 	
-	drawWater(viewMatrix, projMatrix);
+	//drawWater(viewMatrix, projMatrix);
 	//drawQuad(0.5f, 0.5f);
 
 
@@ -463,7 +464,7 @@ bool handleEvents(void)
 		cameraPosition += cameraSpeed * worldUp;
 	}
 	if (state[SDL_SCANCODE_P]) {
-		terrain.initTerrain();
+		terrain.initTerrain(octaves, scalingBias);
 	}
 	if (state[SDL_SCANCODE_Z]) {
 		if(octaves > 2) octaves -= 2;

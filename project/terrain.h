@@ -37,7 +37,7 @@ public:
 
 	void updateTerrain(int octaves, float scalingBias);
 
-	void initTerrain(void);
+	void initTerrain(int octaves, float scalingBias);
 
 	void submitTriangles(void);
 

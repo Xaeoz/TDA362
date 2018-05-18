@@ -74,7 +74,7 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	///////////////////////////////////////////////////////////////////////////
 	vec3 wi = normalize(viewSpaceLightPosition - viewSpacePosition);
 	float d = distance(viewSpaceLightPosition, viewSpacePosition);
-	vec3 Li = point_light_intensity_multiplier * point_light_color * (1 / (d*d));
+	vec3 Li = point_light_intensity_multiplier * point_light_color * (100 / (d*d));
 	if (dot(n, wi) <= 0) {
 		return vec3(0.0);
 	}
@@ -91,7 +91,7 @@ vec3 calculateDirectIllumiunation(vec3 wo, vec3 n)
 	float s = material_shininess;
 	//float F = material_fresnel + (1 - material_fresnel) * pow((1 - dot(wh, wi)), 5);
 	float F = material_fresnel + (1 - material_fresnel) * pow((1 - dot(wh, wi)), 5);
-	float D = ((s + 2) / 2 * PI) * pow(abs(dot(n, wh)), s);
+	float D = ((s + 2) / 2 * PI) * pow(dot(n, wh), s);
 	float G = min(1, min((2 * (dot(n, wh) * dot(n, wo))) / dot(wh, wo), (2 * (dot(n, wh)  *dot(n, wi))) / dot(wh, wo)));
 	float brdf = (F * D * G) / (4 * dot(n, wo) * dot(n, wi));
 	///////////////////////////////////////////////////////////////////////////
@@ -186,12 +186,7 @@ void main()
 		emission_term;
 
 	fragmentColor = vec4(shading, 1.0f);
-	//vec3 pos = positionOut/600 + vec3(0.0, 0.5, 0.0);
-	//fragmentColor = vec4(0, pos.y, 1-pos.y, 1.0);
-	//fragmentColor = normalize(vec4(viewSpaceNormal, 0.0f));
-	//fragmentColor = normalize(normal);
-	//fragmentColor = vec4(texCoord, 0.0, 1.0f);
-	//fragmentColor = vec4(vec3(positionOut.y), 1.0);
+
 	return;
 
 }

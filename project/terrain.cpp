@@ -48,7 +48,8 @@ float* Terrain::generateVertices(int octaves, float scalingBias)
 		for (int k = 0; k < verticesPerRow; k++) {
 			verts[idx++] = x;
 			//verts[idx++] = generator.generateHeight(x/64.0f, z/64.0f, vertexDistance);
-			verts[idx++] = perlinNoise[j*verticesPerRow + k] * 600;
+			verts[idx++] = perlinNoise[j*verticesPerRow + k];
+			//verts[idx++] = 1.0;
 			verts[idx++] = z;
 			x += vertexDistance;
 		}
@@ -79,7 +80,7 @@ int* Terrain::generateIndices(void) {
 	int rows = sqrt(tesselation / 2);
 	int columns = rows + 1;
 	int* indices = NULL;
-	m_numIndices = 2 * rows*columns + rows;
+	m_numIndices = 2 * rows*columns + rows -1;
 	indices = new int[m_numIndices];
 	int idx = 0;
 	for (int r = 0; r < rows; r++) {
@@ -87,9 +88,9 @@ int* Terrain::generateIndices(void) {
 
 			indices[idx++] = (r + 1) * columns + c;
 			indices[idx++] = r * columns + c;
-			if (r == rows - 1) {
-				indices[idx] = (r + 1) * columns + c - 1;
-			}
+			//if (r == rows - 1) {
+			//	indices[idx] = (r + 1) * columns + c - 1;
+			//}
 		}
 
 		if (r < rows - 1) {
@@ -105,26 +106,27 @@ float * Terrain::calculateSurfaceNormals(int * indices, float * verts) {
 
 	float * surfaceNormals = new float[tesselation*3];
 	int idx = 0;
-	int vertexIndex = 0;
-	int numberOfRestartIndices = sqrt(tesselation / 2) - 1;
-	for (int i = 0; i < m_numIndices - 2 - numberOfRestartIndices; i++) {
-		int offset = 0;
-		if (indices[i + offset] == triangleRestartIndex) offset++;
-		int i1 = indices[i + offset];
-		offset++;
-		if (indices[i + offset] == triangleRestartIndex) offset++;
-		int i2 = indices[i + offset];
-		offset++;
-		if (indices[i + offset] == triangleRestartIndex) offset++;
-		int i3 = indices[i + offset];
+	int clockWise = 1;
+	for (int i = 0; i < m_numIndices - 2; i++) {
+		if (indices[i] == triangleRestartIndex) clockWise = (clockWise +1) % 2;
+		if (indices[i] == triangleRestartIndex || indices[i + 1] == triangleRestartIndex || indices[i + 2] == triangleRestartIndex) continue;
+		int i1 = indices[i];
+		int i2 = indices[i + 1];
+		int i3 = indices[i + 2];
 
-		vec3 v1 = vec3(verts[i1], verts[i1 + 1], verts[i1 + 2]);
+		vec3 v1 = vec3(verts[i1*3], verts[i1*3 + 1], verts[i1*3 + 2]);
 		vec3 v2 = vec3(verts[i2*3], verts[i2*3 + 1], verts[i2*3 + 2]);
 		vec3 v3 = vec3(verts[i3*3], verts[i3*3 + 1], verts[i3*3 + 2]);
 		
 		vec3 vec1 = v2 - v1;
 		vec3 vec2 = v3 - v1;
-		vec3 normal = cross(vec2, vec1);
+		vec3 normal;
+		if (i % 2 == clockWise) {
+			normal = normalize(cross(vec2, vec1));
+		}
+		else {
+			normal = normalize(cross(vec1, vec2));
+		}
 
 		surfaceNormals[idx++] = normal.x;
 		surfaceNormals[idx++] = normal.y;
@@ -141,16 +143,19 @@ float * Terrain::calculateVertexNormals(int * indices, float * surfaceNormals)
 	float * vertexNormals = new float[verticesPerRow*verticesPerRow * 3];
 	for (int i = 0; i < verticesPerRow*verticesPerRow; i++) {
 		vec3 normalSum = vec3(0);
+		int restartIndexesPassed = 0;
 		for (int j = 0; j < m_numIndices; j++) {
+			int test = indices[j];
+			if (indices[j] == triangleRestartIndex) restartIndexesPassed++;
 			if (indices[j] == i) {
-				int indexOfTriangle = j / 3;
-				int indexInTriangle = j % 3;
-				int pos = indexOfTriangle * 3;
-				normalSum += vec3(surfaceNormals[pos], surfaceNormals[pos + 1], surfaceNormals[pos + 2]);
+				for (int k = max(0, j - 2); k <= j; k++) {
+					if(!(indices[k] == triangleRestartIndex || indices[k+1] == triangleRestartIndex || indices[k+2] == triangleRestartIndex) && k < m_numIndices - 2)
+						normalSum += vec3(surfaceNormals[(k - restartIndexesPassed*3)*3], surfaceNormals[(k - restartIndexesPassed*3)*3 + 1], surfaceNormals[(k - restartIndexesPassed*3)*3 + 2]);
+				}
 			}
 		}
 		vec3 normal = normalize(normalSum);
-		vertexNormals[i*3] = normal.x;
+		vertexNormals[i * 3] = normal.x;
 		vertexNormals[i * 3 + 1] = normal.y;
 		vertexNormals[i * 3 + 2] = normal.z;
 	}
@@ -166,28 +171,20 @@ void Terrain::updateTerrain(int octaves, float scalingBias)
 	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
 
 	printf("Updated terrain \n");
-	glGenVertexArrays(1, &m_vao);
 	glBindVertexArray(m_vao);
 	// Create a handle for the vertex position buffer
-	glGenBuffers(1, &m_positionBuffer);													// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ARRAY_BUFFER, m_positionBuffer);									// Set the newly created buffer as the current one
 	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), verts, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
 	glVertexAttribPointer(0, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
-	glEnableVertexAttribArray(0);
-
-	glGenBuffers(1, &m_uvBuffer);													// Create a handle for the vertex position buffer
+											// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ARRAY_BUFFER, m_uvBuffer);									// Set the newly created buffer as the current one
 	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 2 * sizeof(float), tileTexCoords, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
-	glVertexAttribPointer(2, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
-	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);	
 
-	glGenBuffers(1, &m_vertNormalBuffer);													// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ARRAY_BUFFER, m_vertNormalBuffer);									// Set the newly created buffer as the current one
 	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), vertexNormals, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
 	glVertexAttribPointer(4, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
-	glEnableVertexAttribArray(4);
 
-	glGenBuffers(1, &m_indexBuffer);													// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_indexBuffer);									// Set the newly created buffer as the current one
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_numIndices * sizeof(int), indices, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
 																									//glVertexAttribPointer(3, 1, GL_INT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
@@ -195,10 +192,10 @@ void Terrain::updateTerrain(int octaves, float scalingBias)
 
 }
 
-void Terrain::initTerrain(void) {
+void Terrain::initTerrain(int octaves, float scalingBias) {
 	generator.generateSeedArray(tesselation);
 	int * indices = generateIndices();
-	float * verts = generateVertices(4, .6f);
+	float * verts = generateVertices(octaves, scalingBias);
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
 	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
