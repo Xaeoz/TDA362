@@ -32,7 +32,7 @@ void main()
 	viewSpaceNormal = (normalMatrix * vec4(normalIn, 0.0)).xyz;
 
 	viewSpacePosition = (modelViewMatrix * vec4(position, 1.0f)).xyz;
-	gl_ClipDistance[0] = dot(modelMatrix*vec4(1), clippingPlane);
+	gl_ClipDistance[0] = dot(modelMatrix*vec4(position, 1), clippingPlane);
 
 	normal = vec4(normalIn, 1.0);
 

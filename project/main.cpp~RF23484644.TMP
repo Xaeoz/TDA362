@@ -1,11 +1,12 @@
 
 
-#include "Water.h"
 #ifdef _WIN32
 extern "C" _declspec(dllexport) unsigned int NvOptimusEnablement = 0x00000001;
 #endif
 
 #include <GL/glew.h>
+#include <cmath>
+#include <cstdlib>
 #include <algorithm>
 #include <chrono>
 
@@ -20,10 +21,7 @@ using namespace glm;
 #include <Model.h>
 #include "hdr.h"
 #include "fbo.h"
-#include "HeightGenerator.h"
 #include "heightfield.h"
-#include "terrain.h"
-
 
 
 
@@ -40,22 +38,7 @@ float previousTime = 0.0f;
 float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
-int octaves = 4;
-float scalingBias = 0.6f;
-
-//int tesselation = 262144;
-int size = 400;
-int tesselation = ((size/6)*2)*((size/6)*2);
-//int tesselation = 2000;
-HeightGenerator heightGenerator(tesselation);
-Terrain terrain(tesselation, heightGenerator);
-
-
-//TODO: Remove this in favour of utilizing illumination map in the shaders
-//Global Light (the sun)
-vec3 globalLightPosition = vec3(0, 100, -1000);				//Position of the imaginary "sun"
-vec3 globalLightColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);		//Color of the light it is emitting
-vec3 globalLightDirection = normalize(vec3(2500, -100, 10000));		//Direction of the global light
+HeightField terrain;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
@@ -69,24 +52,24 @@ GLuint waterShader;
 ////////////////////////////////////////////////////////////////////////////////
 // Water
 ///////////////////////////////////////////////////////////////////////////////
-Water water;
+FboInfo reflectionFbo, refractionFbo;
+float waterYPos = 35.0f;
 
 
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
 ///////////////////////////////////////////////////////////////////////////////
-float environment_multiplier = 2.0f;
+float environment_multiplier = 1.0f;
 GLuint environmentMap, irradianceMap, reflectionMap;
 const std::string envmap_base_name = "001";
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
 ///////////////////////////////////////////////////////////////////////////////
 vec3 lightPosition;
-vec3 point_light_color = vec3(1.f, 1.0f, 1.f);
+vec3 point_light_color = vec3(1.f, 1.f, 1.f);
 
-float point_light_intensity_multiplier = 100.0f;
+float point_light_intensity_multiplier = 10000.0f;
 
 
 
@@ -95,10 +78,9 @@ float point_light_intensity_multiplier = 100.0f;
 ///////////////////////////////////////////////////////////////////////////////
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
-//vec3 cameraPosition(-270.0f, 300.0f, 70.0f);
-vec3 cameraPosition(0.0f, 50.0f, 70.0f);
+vec3 cameraPosition(-70.0f, 50.0f, 70.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-float cameraSpeed = 10.0f;
+float cameraSpeed = 1.0f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -144,37 +126,11 @@ void initGL()
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
 	sphereModel     = labhelper::loadModelFromOBJ("../scenes/sphere.obj");
 
-	float landingPadYPosition = 5.0f;
-
 	roomModelMatrix = mat4(1.0f);
-
-	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
-	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
-	vec3 scaleFactor = vec3(size*3, 100, size*3); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -0.50f, -1.0f));
-	waterModelMatrix = translate(waterYPosition * worldUp);
-	terrain.initTerrain(octaves, scalingBias);
-
-
-
-
-
-	///////////////////////////////////////////////////////////////////////
-	//		Setup Water class
-	///////////////////////////////////////////////////////////////////////
-	const float waterYPos = -20.0f;
-	const float waterSize = 500.0f;
-
-	//Reflection map resolution (higher is better and slower)
-	const float reflectionX = 1280;
-	const float reflectionY = 720;
-
-	//Refraction map resolution (higher is better and slower)
-	const float refractionX = 1280;
-	const float refractionY = 720;
-
-	water.init(waterYPos*worldUp, waterSize, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
-
+	fighterModelMatrix = translate(65.0f * worldUp);
+	landingPadModelMatrix = translate(50.0f* worldUp);
+	terrainModelMatrix = glm::scale(vec3(1000.0f, 333.0f, 1000.0f));
+	terrain.generateMesh(262144);
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
 	///////////////////////////////////////////////////////////////////////
@@ -188,12 +144,14 @@ void initGL()
 	irradianceMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + "_irradiance.hdr");
 
 	//Load terrain textures
-	std::string heightFieldFilePath = "../res/land_with_pond.png";
-	std::string heightFieldTexture = "../res/wildgrass.png";
-	std::string heightFieldNormals = "../res/NormalMap.png";
-	//terrain.loadHeightField(heightFieldFilePath);
-	terrain.loadDiffuseTexture(heightFieldTexture);
-	//terrain.loadNormalMap(heightFieldNormals);
+	terrain.loadHeightField("../scenes/nlsFinland/L3123F.png");
+	terrain.loadDiffuseTexture("../scenes/nlsFinland/L3123F_downscaled.jpg");
+
+	///////////////////////////////////////////////////////////////////////
+	// Setup water FBOs
+	///////////////////////////////////////////////////////////////////////
+	reflectionFbo.resize(1280, 720);
+	refractionFbo.resize(1280, 720); 
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
 	glEnable(GL_CULL_FACE);		// enables backface culling
@@ -224,36 +182,10 @@ void drawBackground(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 
 void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix, const glm::vec4 clipPlane)
 {
-	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
-
-	/*//Land + Heightfield
-	glUseProgram(heightShader);
-	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
-	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
-	// Environment
-	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 1);
-
-	// camera
-	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
-	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
-	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
-	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
-	//material
-	labhelper::setUniformSlow(heightShader, "material_reflectivity", .1f);
-	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_emission", .5f);
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
-	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
-	terrain.submitTriangles();*/
-
 	glUseProgram(currentShaderProgram);
 	labhelper::setUniformSlow(currentShaderProgram, "clippingPlane", clipPlane);
 	// Light source
+	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
 	labhelper::setUniformSlow(currentShaderProgram, "point_light_color", point_light_color);
 	labhelper::setUniformSlow(currentShaderProgram, "point_light_intensity_multiplier", point_light_intensity_multiplier);
 	labhelper::setUniformSlow(currentShaderProgram, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
@@ -266,51 +198,68 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	// camera
 	labhelper::setUniformSlow(currentShaderProgram, "viewInverse", inverse(viewMatrix));
 
-	//// landing pad 
-	//labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
+	// landing pad 
+	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
 
-	//labhelper::render(landingpadModel);
+	labhelper::render(landingpadModel);
 
-	//// Fighter
-	//labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
+	// Fighter
+	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
 
-	//labhelper::render(fighterModel);
+	labhelper::render(fighterModel);
 	
 	
 }
 
 void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
-	water.m_moveFactor += WAVE_SPEED;
-	if (water.m_moveFactor >= 1.0f) water.m_moveFactor = 0;			//Reset counter if it passes 1.0f
-	//Set active shader program
 	glUseProgram(waterShader);
-
-	glEnable(GL_BLEND);			//Enable alpha blending (used to smooth out water edges)
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	//Setup data in shaders, for information on each field, refer to the shader
-	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * water.m_modelMatrix);
-	labhelper::setUniformSlow(waterShader, "moveFactor", water.m_moveFactor);
-	labhelper::setUniformSlow(waterShader, "cameraPosition", cameraPosition);
-	labhelper::setUniformSlow(waterShader, "modelMatrix", water.m_modelMatrix);
-	labhelper::setUniformSlow(waterShader, "globalLightPosition", globalLightPosition);
-	labhelper::setUniformSlow(waterShader, "globalLightColor", globalLightColor);
-	labhelper::setUniformSlow(waterShader, "globalLightDirection", globalLightDirection);
-	//These need to match the near and far plane of the current projection matrix
-	labhelper::setUniformSlow(waterShader, "nearPlane", 1.0f);
-	labhelper::setUniformSlow(waterShader, "farPlane", 2000.0f);
-	//Binds necessary textures, VAO, and index buffer, and then calls drawElements
-	water.render();
-	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * translate(waterYPos * worldUp));
+	glActiveTexture(GL_TEXTURE9);
+	glBindTexture(GL_TEXTURE_2D, reflectionFbo.colorTextureTargets[0]);
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_2D, refractionFbo.colorTextureTargets[0]);
 	
-	glDisable(GL_BLEND);											//Disable blend again after rendering
+
+	//Generate base mesh
+	GLuint water_vert_buffer, water_index_buffer, vertexArrayObject;
+
+	glGenVertexArrays(1, &vertexArrayObject);
+	glBindVertexArray(vertexArrayObject);
+	const float magnitude = 100;
+
+	float verts[] = { -1, 0, 1,	//v0
+		1, 0, 1, 	//v1
+		1, 0, -1, 	//v2 
+		-1, 0, -1,	//v3
+	};
+
+	for (int i = 0; i < sizeof(verts) / sizeof(float); i++)
+	{
+		verts[i] = verts[i] * magnitude;
+	}
+
+	glGenBuffers(1, &water_vert_buffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, water_vert_buffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(0, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(0);
+
+	const int indices[] = { 0,1,3, 3,1,2 };
+
+	glGenBuffers(1, &water_index_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, water_index_buffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+
+
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
 
 void drawQuad(float width, float height)
@@ -318,7 +267,7 @@ void drawQuad(float width, float height)
 
 	glUseProgram(simpleShaderProgram);
 	glActiveTexture(GL_TEXTURE10);
-	glBindTexture(GL_TEXTURE_2D, (water.m_reflectionFbo.colorTextureTargets.at(0)));
+	glBindTexture(GL_TEXTURE_2D, (reflectionFbo.colorTextureTargets.at(0)));
 
 	//labhelper::drawFullScreenQuad();
 	//return;
@@ -344,46 +293,13 @@ void drawQuad(float width, float height)
 	
 }
 
-void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm::vec4 clipPlane)
-{
-	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
-	//Land + Heightfield
-	glUseProgram(heightShader);
-	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "clippingPlane", clipPlane);
-	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
-	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
-	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
-	// Environment
-	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 3);
-
-	// camera
-	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 0);
-	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
-	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
-	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
-	//material
-	labhelper::setUniformSlow(heightShader, "material_reflectivity", .01f);
-	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_emission", 1.0f);
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
-	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
-	terrain.submitTriangles();
-}
-
 ///////////////////////////////////////////////////////////////////////////
 // Draws everything that does not require multiple passes
 ///////////////////////////////////////////////////////////////////////////
 void drawSinglePassScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix, const glm::vec4 clipPlane)
 {
 	drawBackground(viewMatrix, projectionMatrix);
-	drawScene(shaderProgram, viewMatrix, projectionMatrix, lightViewMatrix, lightProjectionMatrix, clipPlane);
-	drawTerrain(viewMatrix, projectionMatrix, clipPlane);
+	drawScene(shaderProgram, viewMatrix, projectionMatrix, lightViewMatrix, lightProjectionMatrix, vec4(0));
 	debugDrawLight(viewMatrix, projectionMatrix, vec3(lightPosition));
 }
 
@@ -402,16 +318,13 @@ void display(void)
 	}
 
 	///////////////////////////////////////////////////////////////////////////
-	// setup matrices 
+	// setup matrices
 	///////////////////////////////////////////////////////////////////////////
-
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 4000.0f);
-
+	mat4 projMatrix = perspective(radians(45.0f), float(windowWidth) / float(windowHeight), 5.0f, 2000.0f);
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
-	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);
+	vec4 lightStartPosition = vec4(40.0f, 40.0f, 0.0f, 1.0f);
 	lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
-	//lightPosition = lightStartPosition;
 	mat4 lightViewMatrix = lookAt(lightPosition, vec3(0.0f), worldUp);
 	mat4 lightProjMatrix = perspective(radians(45.0f), 1.0f, 25.0f, 100.0f);
 
@@ -429,27 +342,24 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// Draw scene above water for reflections
 	///////////////////////////////////////////////////////////////////////////
-	glBindFramebuffer(GL_FRAMEBUFFER, water.m_reflectionFbo.framebufferId);
-	glViewport(0, 0, water.m_reflectionFbo.width, water.m_reflectionFbo.height);
+	glBindFramebuffer(GL_FRAMEBUFFER, reflectionFbo.framebufferId);
+	glViewport(0, 0, reflectionFbo.width, reflectionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 	//distance to move camera to move "below" water
-	float distanceToMove = 2 * (cameraPosition.y - water.m_modelMatrix[3].y);  
-	vec3 reflectionCameraPosition = cameraPosition - worldUp * distanceToMove;
-
-	//Look at the inversed y direction (inverse pitch)
-	mat4 reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + vec3(cameraDirection.x, -cameraDirection.y, cameraDirection.z), worldUp);
-	float renderPassOffset = 1.0f;
-	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -water.m_modelMatrix[3].y +1.0f));
+	float distance = 2 * cameraPosition.y;  //Assuming water is on 0
+	vec3 reflectionCameraPosition = cameraPosition + worldUp * distance;
+	mat4 pitch = rotate(cameraDirection.y, normalize(cross(cameraDirection, worldUp)));
+	vec3 reflectCameraDirection = vec3(pitch * vec4(cameraDirection, 0.0f));
+	mat4 reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + reflectCameraDirection, worldUp);
+	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -60));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw below water for refraction
 	///////////////////////////////////////////////////////////////////////////
-	glBindFramebuffer(GL_FRAMEBUFFER, water.m_refractionFbo.framebufferId);
-	glViewport(0, 0, water.m_refractionFbo.width, water.m_refractionFbo.height);
+	glBindFramebuffer(GL_FRAMEBUFFER, refractionFbo.framebufferId);
+	glViewport(0, 0, refractionFbo.width, refractionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	//Offset the clipping plane slightly above the water to avoid black artefact lines along intersections with shallow terrain
-	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y+1));
+	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, 60));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera
@@ -460,13 +370,34 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
+	/*drawBackground(viewMatrix, projMatrix);
+	drawScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
+	debugDrawLight(viewMatrix, projMatrix, vec3(lightPosition));*/
 
+	glUseProgram(heightShader);
+	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
+	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
+	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
+	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
+	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
+	// Environment
+	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier*3);
+
+	// camera
+	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
+	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
+	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projMatrix * viewMatrix * terrainModelMatrix);
+	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
+	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
+	labhelper::setUniformSlow(heightShader, "normalMatrix", inverse(transpose(viewMatrix * terrainModelMatrix)));
+	terrain.submitTriangles();
 	
-	//drawWater(viewMatrix, projMatrix);
+	drawWater(viewMatrix, projMatrix);
 	//drawQuad(0.5f, 0.5f);
 
 
 } 
+
 
 bool handleEvents(void)
 {
@@ -501,7 +432,6 @@ bool handleEvents(void)
 	const uint8_t *state = SDL_GetKeyboardState(nullptr);
 	vec3 cameraRight = cross(cameraDirection, worldUp);
 
-
 	if (state[SDL_SCANCODE_W]) {
 		cameraPosition += cameraSpeed* cameraDirection;
 	}
@@ -519,29 +449,6 @@ bool handleEvents(void)
 	}
 	if (state[SDL_SCANCODE_E]) {
 		cameraPosition += cameraSpeed * worldUp;
-	}
-	if (state[SDL_SCANCODE_P]) {
-		terrain.initTerrain(octaves, scalingBias);
-	}
-	if (state[SDL_SCANCODE_Z]) {
-		if(octaves > 2) octaves -= 2;
-		printf("Octaves: %i \n", octaves);
-		terrain.updateTerrain(octaves, scalingBias);
-	}
-	if (state[SDL_SCANCODE_X]) {
-		if (octaves < 20) octaves += 2;
-		printf("Octaves: %i \n", octaves);
-		terrain.updateTerrain(octaves, scalingBias);
-	}
-	if (state[SDL_SCANCODE_C]) {
-		if (scalingBias > 0.2f) scalingBias -= 0.2f;
-		printf("bias: %f \n", scalingBias);
-		terrain.updateTerrain(octaves, scalingBias);
-	}
-	if (state[SDL_SCANCODE_V]) {
-		if (scalingBias < 4.0f) scalingBias += 0.2f;
-		printf("bias: %f \n", scalingBias);
-		terrain.updateTerrain(octaves, scalingBias);
 	}
 	return quitEvent;
 }
@@ -566,7 +473,6 @@ int main(int argc, char *argv[])
 
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
-	
 
 	while (!stopRendering) {
 		//update currentTime
