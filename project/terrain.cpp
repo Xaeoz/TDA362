@@ -7,7 +7,6 @@
 #include <glm/glm.hpp>
 #include <stb_image.h>
 #include <labhelper.h>
-#include <random>
 
 using namespace glm;
 using std::string;

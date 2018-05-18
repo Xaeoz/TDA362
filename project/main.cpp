@@ -19,9 +19,7 @@ using namespace glm;
 
 #include <Model.h>
 #include "hdr.h"
-#include "fbo.h"
 #include "HeightGenerator.h"
-#include "heightfield.h"
 #include "terrain.h"
 
 

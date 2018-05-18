@@ -27,9 +27,7 @@ out vec3 positionOut;
 
 void main() 
 {
-<<<<<<< HEAD
 	normal = vec4(normalIn, 0.0);
-=======
 
 	normal = normalize(texture2D(heightNormals, texCoordIn));
 	//float stepLength = 0.001;
@@ -39,7 +37,6 @@ void main()
 	//vec3 vector31 = point3 - point1;
 	//vec3 vector21 = point2 - point1;
 	//normal = normalize(vec4(cross(vector21, vector31), 1.0));
->>>>>>> water_simplish
 	viewSpaceNormal = normalize((normalMatrix * normal)).xyz;
 	//viewSpaceNormal = vec3(0.0f, 1.0f, 0.0f);
 	//viewSpaceNormal = normalize(viewSpaceNormal);
@@ -47,11 +44,10 @@ void main()
 	gl_Position = modelViewProjectionMatrix * vec4(position.x, position.y, position.z, 1.0f);
 	viewSpacePosition = (modelViewMatrix * vec4(position.x, position.y, position.z, 1.0f)).xyz;
 	//viewSpacePosition = (modelViewMatrix * vec4(position.x, position.x, position.z, 1.0f)).xyz;
-<<<<<<< HEAD
 	positionOut = position;
-=======
+
+	//Needed to clip terrain from unecessary render passes
 	gl_ClipDistance[0] = dot(modelMatrix*vec4(position.x, 0-texture2D(heightMap, texCoordIn.xy).x, position.z, 1.0f), clippingPlane);
->>>>>>> water_simplish
 	texCoord = texCoordIn;
 }
 

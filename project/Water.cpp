@@ -1,10 +1,11 @@
 #include <vector>
 
-#include "Water.h"
+
 #include <stb_image.h>
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
 #include <iostream>
+#include "Water.h"
 
 using namespace glm;
 using std::string;
