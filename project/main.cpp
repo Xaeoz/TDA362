@@ -39,10 +39,11 @@ float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
 int octaves = 4;
-float scalingBias = 0.6f;
+float persistance = .9f;
+float lacunarity = 2.8f;
 
 //int tesselation = 262144;
-int size = 400;
+int size = 600;
 int tesselation = ((size/6)*2)*((size/6)*2);
 //int tesselation = 2000;
 HeightGenerator heightGenerator(tesselation);
@@ -147,11 +148,9 @@ void initGL()
 
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
-	vec3 scaleFactor = vec3(size*3, 100, size*3); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, -0.50f, -1.0f));
-	terrain.initTerrain(octaves, scalingBias);
-
-
+	vec3 scaleFactor = vec3(size*4, 500, size*4); //Use this to scale the map
+	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, 0.0f, -1.0f));
+	terrain.initTerrain(octaves, persistance, lacunarity);
 
 
 
@@ -492,27 +491,37 @@ bool handleEvents(void)
 		cameraPosition += cameraSpeed * worldUp;
 	}
 	if (state[SDL_SCANCODE_P]) {
-		terrain.initTerrain(octaves, scalingBias);
+		terrain.initTerrain(octaves, persistance, lacunarity);
 	}
 	if (state[SDL_SCANCODE_Z]) {
-		if(octaves > 2) octaves -= 2;
-		printf("Octaves: %i \n", octaves);
-		terrain.updateTerrain(octaves, scalingBias);
+		if(persistance >= 0.2) persistance -= 0.1;
+		printf("persistance: %f \n", persistance);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
 	}
 	if (state[SDL_SCANCODE_X]) {
-		if (octaves < 20) octaves += 2;
-		printf("Octaves: %i \n", octaves);
-		terrain.updateTerrain(octaves, scalingBias);
+		if (persistance <= 2.9) persistance += 0.1;
+		printf("persistance: %f \n", persistance);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
 	}
 	if (state[SDL_SCANCODE_C]) {
-		if (scalingBias > 0.2f) scalingBias -= 0.2f;
-		printf("bias: %f \n", scalingBias);
-		terrain.updateTerrain(octaves, scalingBias);
+		if (lacunarity > 1.0f) lacunarity -= .5f;
+		printf("lacunarity: %f \n", lacunarity);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
 	}
 	if (state[SDL_SCANCODE_V]) {
-		if (scalingBias < 4.0f) scalingBias += 0.2f;
-		printf("bias: %f \n", scalingBias);
-		terrain.updateTerrain(octaves, scalingBias);
+		if (lacunarity < 10.0f) lacunarity += .5f;
+		printf("lacunarity: %f \n", lacunarity);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
+	}
+	if (state[SDL_SCANCODE_B]) {
+		if (octaves >= 2) octaves -= 1;
+		printf("octaves: %i \n", octaves);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
+	}
+	if (state[SDL_SCANCODE_N]) {
+		if (octaves <= sqrt(tesselation)) octaves += 1;
+		printf("octaves: %i \n", octaves);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
 	}
 	return quitEvent;
 }

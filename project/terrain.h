@@ -24,7 +24,7 @@ public:
 
 	Terrain(int tesselation, HeightGenerator generator);
 
-	float * generateVertices(int octaves, float scalingBias);
+	float * generateVertices(int octaves, float persistance, float lacunarity);
 
 
 	float * generateTileTexCoords(int nrOfTiles);
@@ -35,9 +35,9 @@ public:
 
 	float * calculateVertexNormals(int * indices, float * surfaceNormals);
 
-	void updateTerrain(int octaves, float scalingBias);
+	void updateTerrain(int octaves, float persistance, float lacunarity);
 
-	void initTerrain(int octaves, float scalingBias);
+	void initTerrain(int octaves, float persistance, float lacunarity);
 
 	void submitTriangles(void);
 

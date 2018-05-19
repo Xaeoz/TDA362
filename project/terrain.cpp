@@ -29,7 +29,7 @@ Terrain::Terrain(int tesselation, HeightGenerator generator)
 	triangleRestartIndex = 9999999;
 }
 
-float* Terrain::generateVertices(int octaves, float scalingBias)
+float* Terrain::generateVertices(int octaves, float persistance, float lacunarity)
 {
 
 	float* verts = NULL;
@@ -38,7 +38,7 @@ float* Terrain::generateVertices(int octaves, float scalingBias)
 	verts = new float[nrOfVertices];
 
 	float * perlinNoise = new float[nrOfVertices/3];
-	generator.generatePerlinNoise(nrOfVertices/3, octaves, scalingBias, perlinNoise);
+	generator.generatePerlinNoise(nrOfVertices/3, octaves, perlinNoise, persistance, lacunarity);
 
 	float z = 2;
 	int idx = 0;
@@ -46,9 +46,7 @@ float* Terrain::generateVertices(int octaves, float scalingBias)
 		float x = 0;
 		for (int k = 0; k < verticesPerRow; k++) {
 			verts[idx++] = x;
-			//verts[idx++] = generator.generateHeight(x/64.0f, z/64.0f, vertexDistance);
 			verts[idx++] = perlinNoise[j*verticesPerRow + k];
-			//verts[idx++] = 1.0;
 			verts[idx++] = z;
 			x += vertexDistance;
 		}
@@ -161,9 +159,9 @@ float * Terrain::calculateVertexNormals(int * indices, float * surfaceNormals)
 	return vertexNormals;
 }
 
-void Terrain::updateTerrain(int octaves, float scalingBias)
+void Terrain::updateTerrain(int octaves, float persistance, float lacunarity)
 {
-	float * verts = generateVertices(octaves, scalingBias);
+	float * verts = generateVertices(octaves, persistance, lacunarity);
 	int * indices = generateIndices();
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
@@ -191,10 +189,10 @@ void Terrain::updateTerrain(int octaves, float scalingBias)
 
 }
 
-void Terrain::initTerrain(int octaves, float scalingBias) {
+void Terrain::initTerrain(int octaves, float persistance, float lacunarity) {
 	generator.generateSeedArray(tesselation);
 	int * indices = generateIndices();
-	float * verts = generateVertices(octaves, scalingBias);
+	float * verts = generateVertices(octaves, persistance, lacunarity);
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
 	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);

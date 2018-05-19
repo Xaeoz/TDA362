@@ -24,7 +24,7 @@ HeightGenerator::HeightGenerator(int tesselation)
 	//Generate seed for rng so that we can generate a new seed
 	rng.seed(std::random_device()());
 	//Create distribution function
-	std::uniform_int_distribution<std::mt19937_64::result_type> dist(1, 100000000000);
+	std::uniform_int_distribution<std::default_random_engine::result_type> dist(1, 1000000000000);
 	//Generate new seed for later use
 	seed = dist(rng);
 	//Generate seed array
@@ -38,7 +38,8 @@ void HeightGenerator::setTesselation(int tesselationIn)
 
 float HeightGenerator::generateRandomFloat(float min, float max)
 {
-	std::uniform_real_distribution<float> floatDist(min, max);
+	/*std::normal_distribution<float> floatDist(RAND_MAX/2, RAND_MAX);*/
+	std::uniform_real_distribution<float> floatDist(0.0, 1.0);
 	return floatDist(rng);
 }
 
@@ -52,8 +53,8 @@ float HeightGenerator::generateNoise(int x, int z)
 {
 	//Set seed based on texCoords. We set the seed to get the same noise for the same x and z.
 	//it is important for the algorithm
-	rng.seed(x*95728947 + z*423423532 + seed);
-	float randFloat = generateRandomFloat(-4.0, 4.0);
+	rng.seed(x*512343 + z*5234776 + seed);
+	float randFloat = generateRandomFloat(0.0, 1.0);
 	//Generate noise between 0 and 1 from seed
 	return randFloat;
 }
@@ -93,44 +94,71 @@ float HeightGenerator::interpolate(float a, float b, float blend)
 
 void HeightGenerator::generateSeedArray(int size) {
 	seedArray = new float[size];
-	for (int i = 0; i < size; i++) seedArray[i] = generateNoise(rand(), rand());
+	int rows = sqrt(size);
+	for (int i = 0; i < rows; i++)
+		for(int j = 0; j < rows; j++){
+			seedArray[i * rows + j] = generateNoise(dist(rng), dist(rng));
+		}
 }
 
-void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float scalingBias, float* outputArray)
+void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float* outputArray, float persistance, float lacunarity)
 {
 	int rowLength = sqrt(size);
+	int scale = 1;
+
+	float maxNoise = -999999;
+	float minNoise = 999999;
+
 	for (int i = 0; i < rowLength; i++) {
 		for (int j = 0; j < rowLength; j++) {
+
 			float noise = 0.0f;
-			float scale = 1.0f;
 			float scaleAcc = 0.0f;
+			float amplitude = 1.0f;
+			float frequency = 1;
+			int pitch = rowLength;
+
 
 			for (int o = 0; o < nOctaves; o++) {
-				int pitch = rowLength >> o; //pitch is halved each iteration
-				if (pitch <= 0) pitch = 2;
+				if(pitch <= 0) pitch = 1;
 				int sampleX1 = (i / pitch) * pitch;
 				int sampleY1 = (j / pitch) * pitch;
 
-				int sampleX2 = (sampleX1 + pitch) % rowLength;
-				int sampleY2 = (sampleY1 + pitch) % rowLength;
+				int sampleX2 = (sampleX1 + (int)pitch) % rowLength;
+				int sampleY2 = (sampleY1 + (int)pitch) % rowLength;
 				//How far into the pitch are we?
 				float blendX = (float)(i - sampleX1) / (float)pitch;
 				float blendY = (float)(j - sampleY1) / (float)pitch;
 				//interpolate
-				//float interpolatedSample1 = (1.0f - blendY) * seedArray[sampleX1 * rowLength + sampleY1] + blendY * seedArray[sampleX1 * rowLength + sampleY2];
-				//float interpolatedSample2 = (1.0f - blendY) * seedArray[sampleX2 * rowLength + sampleY1] + blendY * seedArray[sampleX2 * rowLength + sampleY2];
-				float interpolatedSample1 = interpolate(seedArray[sampleX1 * rowLength + sampleY1], seedArray[sampleX1 * rowLength + sampleY2], blendY);
-				float interpolatedSample2 = interpolate(seedArray[sampleX2 * rowLength + sampleY1], seedArray[sampleX2 * rowLength + sampleY2], blendY);
+				float interpolatedSample1 = (1.0f - blendY) * seedArray[sampleX1 * rowLength + sampleY1] + blendY * seedArray[sampleX1 * rowLength + sampleY2];
+				float interpolatedSample2 = (1.0f - blendY) * seedArray[sampleX2 * rowLength + sampleY1] + blendY * seedArray[sampleX2 * rowLength + sampleY2];
+				/*float interpolatedSample1 = interpolate(seedArray[sampleX1 * rowLength + sampleY1], seedArray[sampleX1 * rowLength + sampleY2], blendY);
+				float interpolatedSample2 = interpolate(seedArray[sampleX2 * rowLength + sampleY1], seedArray[sampleX2 * rowLength + sampleY2], blendY);*/
 				//Accumulate noise
-				noise += (blendX * (interpolatedSample2 - interpolatedSample1) + interpolatedSample1) * scale;
+				noise += (((blendX * (interpolatedSample2 - interpolatedSample1) + interpolatedSample1)) * 2 - 1) * amplitude;
 				//noise += (interpolatedSample1, interpolatedSample2, blendX) * scale;
 				//Accumulate scale
-				scaleAcc += scale;
+				scaleAcc += amplitude;
 				//Half the scale
-				scale = scale / scalingBias;
+				frequency *= lacunarity;
+				//pitch = rowLength / frequency;
+				amplitude *= persistance;
+				pitch = rowLength / frequency;
 			}
 
-			outputArray[i * rowLength + j] = noise / scaleAcc; 
+			if (noise > maxNoise) maxNoise = noise;
+			if (noise < minNoise) minNoise = noise;
+
+			outputArray[i * (rowLength)+j] = noise;
+			//outputArray[i * (rowLength)+j] = seedArray[i*j+j];
 		}
 	}
+
+	float noiseDifference = maxNoise - minNoise;
+	/*for (int x = 0; x < rowLength; x++) {
+		for (int y = 0; y < rowLength; y++) {
+			float toNormalize = outputArray[x * (rowLength)+y];
+			outputArray[x * (rowLength)+y] = (toNormalize - minNoise) / (noiseDifference);
+		}
+	}*/
 }

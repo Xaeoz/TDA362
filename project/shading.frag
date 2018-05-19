@@ -184,9 +184,44 @@ void main()
 		direct_illumination_term +
 		indirect_illumination_term +
 		emission_term;
+	
+	//Actual shading
+	
+	//fragmentColor = vec4(shading, 1.0f);
 
-	fragmentColor = vec4(shading, 1.0f);
+	if(normalize(positionOut).y < 0.16) {
+		fragmentColor = vec4(normalize(vec3(6, 80, 170)), 1.0f);
+	}
 
+	if(normalize(positionOut).y > 0.15) {
+		fragmentColor = vec4(normalize(vec3(6, 162, 170)), 1.0f);
+	}
+
+	if(normalize(positionOut).y > 0.31) {
+		fragmentColor = vec4(normalize(vec3(165, 170, 6)), 1.0f);
+	}
+
+	if(normalize(positionOut).y > 0.45) {
+		fragmentColor = vec4(normalize(vec3(6, 170, 9)), 1.0f);
+	}
+
+	if(normalize(positionOut).y > 0.6) {
+		fragmentColor = vec4(normalize(vec3(12, 81, 4)), 1.0f);
+	}
+
+	if(normalize(positionOut).y > 0.75) {
+		fragmentColor = vec4(normalize(vec3(186, 184, 178)), 1.0f);
+	}
+
+	if(normalize(positionOut).y > 0.9) {
+		fragmentColor = vec4(1.0, 1.0, 1.0, 1.0f);
+	}
+	
+	//Watch Perlin noise
+	//fragmentColor = vec4(vec3(normalize(positionOut*0.5 + vec3(0.5)).y), 1.0f);
+	//watch noise array
+	
+	//fragmentColor = vec4(vec3((positionOut).y), 1.0f);
 	return;
 
 }

@@ -8,7 +8,7 @@ public:
 	const float AMPLITUDE;
 	int seed;
 	std::mt19937_64 rng;
-	std::uniform_int_distribution<std::mt19937_64::result_type> dist;
+	std::uniform_int_distribution<std::default_random_engine::result_type> dist;
 	float* seedArray;
 	int tesselation;
 
@@ -32,7 +32,7 @@ public:
 
 	void generateSeedArray(int size);
 
-	void generatePerlinNoise(int size, int nOctaves, float scalingBias, float * outputArray);
+	void generatePerlinNoise(int size, int nOctaves, float * outputArray, float persistance, float lacunarity);
 
 
 
