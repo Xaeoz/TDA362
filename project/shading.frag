@@ -185,7 +185,7 @@ void main()
 		indirect_illumination_term +
 		emission_term;
 
-	fragmentColor = vec4(shading, 1.0f);
+	fragmentColor = vec4(indirect_illumination_term, 1.0f);
 
 	return;
 
