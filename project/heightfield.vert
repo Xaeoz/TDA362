@@ -46,7 +46,7 @@ void main()
 	//positionOut = vec3(position*0.5 + vec3(0.5));
 	positionOut = position;
 	//Needed to clip terrain from unecessary render passes
-	gl_ClipDistance[0] = dot(modelMatrix*vec4(position.x, 0-texture2D(heightMap, texCoordIn.xy).x, position.z, 1.0f), clippingPlane);
+	gl_ClipDistance[0] = dot(modelMatrix*vec4(position.x, position.y, position.z, 1.0f), clippingPlane);
 	texCoord = texCoordIn;
 }
 

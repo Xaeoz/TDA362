@@ -184,6 +184,9 @@ void main()
 		direct_illumination_term +
 		indirect_illumination_term +
 		emission_term;
+
+
+	//fragmentColor = vec4(indirect_illumination_term, 1.0f);			//Removes issue with emission map
 	
 	//Actual shading
 	

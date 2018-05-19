@@ -157,7 +157,7 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
-	const float waterYPos = -20.0f;
+	const float waterYPos = -30.0f;
 	const float waterSize = 500.0f;
 
 	//Reflection map resolution (higher is better and slower)
@@ -334,6 +334,10 @@ void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm
 	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
 	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
+
+	//Clipping
+	labhelper::setUniformSlow(heightShader, "clippingPlane", clipPlane);
+	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
 	
 	//material
 	labhelper::setUniformSlow(heightShader, "material_reflectivity", .1f);

@@ -31,7 +31,7 @@ const float noTransparencyDepth = 5.0f;	//The depth at which the water should be
 
 //Reflectivity of the water (higher means more angles result in specular highlights, 
 //lower means camera need to be close to perfect reflection angle for highlights to appear
-const float specularReflectivity = 0.5;		
+const float specularReflectivity = 0.9;		
 
 void main()
 {
@@ -97,6 +97,7 @@ void main()
 
 	//Mix reflection and refraction based on the refractiveFactor to simulate the fresnel effect
 	fragmentColor = mix(reflectionColor, refractionColor, refractiveFactor);
+
 	//Blend in a bit of bluish-green tint and add the specularHighlights
 	fragmentColor = mix(fragmentColor, vec4(0.0, 0.3, 0.5, 1.0), 0.3) + vec4(specularHighlights, 0.0f);
 
