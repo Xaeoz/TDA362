@@ -108,6 +108,13 @@ void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float* outputA
 
 	float maxNoise = -999999;
 	float minNoise = 999999;
+	int * octaveOffsets = new int[nOctaves * 2];
+	for (int i = 0; i < nOctaves; i++) {
+		int xOffset = generateRandomFloat(1.0, rowLength);
+		octaveOffsets[i * 2] = xOffset;
+		int yOffset = generateRandomFloat(1.0, rowLength);
+		octaveOffsets[i * 2 + 1] = yOffset;
+	}
 
 	for (int i = 0; i < rowLength; i++) {
 		for (int j = 0; j < rowLength; j++) {
@@ -121,8 +128,8 @@ void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float* outputA
 
 			for (int o = 0; o < nOctaves; o++) {
 				if(pitch <= 0) pitch = 1;
-				int sampleX1 = (i / pitch) * pitch;
-				int sampleY1 = (j / pitch) * pitch;
+				int sampleX1 = (i / pitch) * pitch + octaveOffsets[o*2];
+				int sampleY1 = (j / pitch) * pitch + octaveOffsets[o*2+1];
 
 				int sampleX2 = (sampleX1 + (int)pitch) % rowLength;
 				int sampleY2 = (sampleY1 + (int)pitch) % rowLength;
@@ -155,10 +162,10 @@ void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float* outputA
 	}
 
 	float noiseDifference = maxNoise - minNoise;
-	/*for (int x = 0; x < rowLength; x++) {
+	for (int x = 0; x < rowLength; x++) {
 		for (int y = 0; y < rowLength; y++) {
 			float toNormalize = outputArray[x * (rowLength)+y];
 			outputArray[x * (rowLength)+y] = (toNormalize - minNoise) / (noiseDifference);
 		}
-	}*/
+	}
 }

@@ -39,8 +39,8 @@ float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
 int octaves = 4;
-float persistance = .9f;
-float lacunarity = 2.8f;
+float persistance = .7f;
+float lacunarity = 2.3f;
 
 //int tesselation = 262144;
 int size = 600;
