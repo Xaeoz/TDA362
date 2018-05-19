@@ -185,7 +185,14 @@ void main()
 		indirect_illumination_term +
 		emission_term;
 
-	fragmentColor = vec4(indirect_illumination_term, 1.0f);
+
+	//fragmentColor = vec4(indirect_illumination_term, 1.0f);			//Removes issue with emission map
+	
+	//Actual shading
+	fragmentColor = vec4(shading, 1.0f);
+
+	//Watch Perlin noise
+	fragmentColor = vec4(vec3(normalize(positionOut*0.5 + vec3(0.5)).y), 1.0f);
 
 	return;
 

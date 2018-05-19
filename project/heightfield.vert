@@ -40,6 +40,7 @@ void main()
 	//viewSpaceNormal = normalize(viewSpaceNormal);
 	//gl_Position = modelViewProjectionMatrix * vec4(position.x, 0-texture2D(heightMap, normalTexCoord.xy).x, position.z, 1.0f);
 	gl_Position = modelViewProjectionMatrix * vec4(position.x, position.y, position.z, 1.0f);
+	gl_Position = modelViewProjectionMatrix * vec4(position.x, 1.0f, position.z, 1.0f);
 	viewSpacePosition = (modelViewMatrix * vec4(position.x, position.y, position.z, 1.0f)).xyz;
 	//viewSpacePosition = (modelViewMatrix * vec4(position.x, position.x, position.z, 1.0f)).xyz;
 	positionOut = position;

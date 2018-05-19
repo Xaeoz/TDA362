@@ -46,9 +46,7 @@ float* Terrain::generateVertices(int octaves, float scalingBias)
 		float x = 0;
 		for (int k = 0; k < verticesPerRow; k++) {
 			verts[idx++] = x;
-			//verts[idx++] = generator.generateHeight(x/64.0f, z/64.0f, vertexDistance);
 			verts[idx++] = perlinNoise[j*verticesPerRow + k];
-			//verts[idx++] = 1.0;
 			verts[idx++] = z;
 			x += vertexDistance;
 		}
