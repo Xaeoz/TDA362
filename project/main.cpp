@@ -131,7 +131,6 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	backgroundProgram   = labhelper::loadShaderProgram("../project/background.vert",  "../project/background.frag");
 	shaderProgram       = labhelper::loadShaderProgram("../project/shading.vert",     "../project/shading.frag");
-	simpleShaderProgram = labhelper::loadShaderProgram("../project/simple.vert",      "../project/simple.frag");
 	heightShader		= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag");
 	waterShader			= labhelper::loadShaderProgram("../project/water.vert",		  "../project/water.frag");
 
