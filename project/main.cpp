@@ -43,7 +43,7 @@ float persistance = .7f;
 float lacunarity = 2.3f;
 
 //int tesselation = 262144;
-int size = 600;
+int size = 200;
 int tesselation = ((size/6)*2)*((size/6)*2);
 //int tesselation = 2000;
 HeightGenerator heightGenerator(tesselation);
@@ -525,6 +525,17 @@ bool handleEvents(void)
 	if (state[SDL_SCANCODE_N]) {
 		if (octaves <= sqrt(tesselation)) octaves += 1;
 		printf("octaves: %i \n", octaves);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
+	}
+
+	if (state[SDL_SCANCODE_J]) {
+		terrain.generator.start += 0.33;
+		printf("start: %f \n", terrain.generator.start);
+		terrain.updateTerrain(octaves, persistance, lacunarity);
+	}
+	if (state[SDL_SCANCODE_H]) {
+		terrain.generator.start -= 0.33;
+		printf("start: %f \n", terrain.generator.start);
 		terrain.updateTerrain(octaves, persistance, lacunarity);
 	}
 	return quitEvent;

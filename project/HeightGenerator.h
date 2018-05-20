@@ -11,6 +11,7 @@ public:
 	std::uniform_int_distribution<std::default_random_engine::result_type> dist;
 	float* seedArray;
 	int tesselation;
+	float start;
 
 
 
@@ -32,7 +33,9 @@ public:
 
 	void generateSeedArray(int size);
 
-	void generatePerlinNoise(int size, int nOctaves, float * outputArray, float persistance, float lacunarity);
+	void generatePerlinNoise(int size, int nOctaves, float * outputArray, float persistance, float lacunarity, float start);
+
+	void generatePerlinNoise2(int size, int nOctaves, float * outputArray, float scalingBias, float start);
 
 
 

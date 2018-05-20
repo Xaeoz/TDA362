@@ -38,7 +38,8 @@ float* Terrain::generateVertices(int octaves, float persistance, float lacunarit
 	verts = new float[nrOfVertices];
 
 	float * perlinNoise = new float[nrOfVertices/3];
-	generator.generatePerlinNoise(nrOfVertices/3, octaves, perlinNoise, persistance, lacunarity);
+	generator.generatePerlinNoise(nrOfVertices/3, octaves, perlinNoise, persistance, lacunarity, generator.start);
+	//generator.generatePerlinNoise2(nrOfVertices / 3, octaves, perlinNoise, 0.8, generator.start);
 
 	float z = 2;
 	int idx = 0;
