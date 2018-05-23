@@ -141,10 +141,10 @@ void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float* outputA
 				float blendX = (float)((i - sampleX1 + rowLength + (int)start) % rowLength) / (float)pitch;
 				float blendY = (float)((j - sampleY1 + rowLength + (int)start) % rowLength) / (float)pitch;
 				//interpolate
-				float interpolatedSample1 = (1.0f - blendY) * seedArray[sampleX1 * rowLength + sampleY1] + blendY * seedArray[sampleX1 * rowLength + sampleY2];
-				float interpolatedSample2 = (1.0f - blendY) * seedArray[sampleX2 * rowLength + sampleY1] + blendY * seedArray[sampleX2 * rowLength + sampleY2];
-				/*float interpolatedSample1 = interpolate(seedArray[sampleX1 * rowLength + sampleY1], seedArray[sampleX1 * rowLength + sampleY2], blendY);
-				float interpolatedSample2 = interpolate(seedArray[sampleX2 * rowLength + sampleY1], seedArray[sampleX2 * rowLength + sampleY2], blendY);*/
+				/*float interpolatedSample1 = (1.0f - blendY) * seedArray[sampleX1 * rowLength + sampleY1] + blendY * seedArray[sampleX1 * rowLength + sampleY2];
+				float interpolatedSample2 = (1.0f - blendY) * seedArray[sampleX2 * rowLength + sampleY1] + blendY * seedArray[sampleX2 * rowLength + sampleY2];*/
+				float interpolatedSample1 = interpolate(seedArray[sampleX1 * rowLength + sampleY1], seedArray[sampleX1 * rowLength + sampleY2], blendY);
+				float interpolatedSample2 = interpolate(seedArray[sampleX2 * rowLength + sampleY1], seedArray[sampleX2 * rowLength + sampleY2], blendY);
 				//Accumulate noise
 				noise += (((blendX * (interpolatedSample2 - interpolatedSample1) + interpolatedSample1)) * 2 - 1) * amplitude;
 				//noise += (interpolatedSample1, interpolatedSample2, blendX) * scale;

@@ -24,21 +24,22 @@ Terrain::Terrain(int tesselation, HeightGenerator generator)
 	, triangleRestartIndex(0)
 	, m_texid_diffuse(UINT32_MAX)
 	, diffuseMapPath("")
+	, heightCurve()
 {
 	verticesPerRow = (sqrt(tesselation / 2) + 1);
 	triangleRestartIndex = 9999999;
+	heightCurve = new float[10]{ .0f,  .0f,  .0f,  .3f, .4f, .5f, .6f, .7f, .8f, .9f };
 }
 
-float* Terrain::generateVertices(int octaves, float persistance, float lacunarity)
+float* Terrain::generateHeightMap(int octaves, float persistance, float lacunarity)
 {
-
-	float* verts = NULL;
+	float* heightMap = NULL;
 	float vertexDistance = 2.0f / float(verticesPerRow - 1);
 	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
-	verts = new float[nrOfVertices];
+	heightMap = new float[nrOfVertices];
 
-	float * perlinNoise = new float[nrOfVertices/3];
-	generator.generatePerlinNoise(nrOfVertices/3, octaves, perlinNoise, persistance, lacunarity, generator.start);
+	float * perlinNoise = new float[nrOfVertices / 3];
+	generator.generatePerlinNoise(nrOfVertices / 3, octaves, perlinNoise, persistance, lacunarity, generator.start);
 	//generator.generatePerlinNoise2(nrOfVertices / 3, octaves, perlinNoise, 0.8, generator.start);
 
 	float z = 2;
@@ -46,12 +47,32 @@ float* Terrain::generateVertices(int octaves, float persistance, float lacunarit
 	for (int j = 0; j < verticesPerRow; j++) {
 		float x = 0;
 		for (int k = 0; k < verticesPerRow; k++) {
-			verts[idx++] = x;
-			verts[idx++] = perlinNoise[j*verticesPerRow + k];
-			verts[idx++] = z;
+			heightMap[idx++] = x;
+			heightMap[idx++] = perlinNoise[j*verticesPerRow + k];
+			heightMap[idx++] = z;
 			x += vertexDistance;
 		}
 		z -= vertexDistance;
+	}
+	return heightMap;
+
+}
+
+float* Terrain::generateVertices(float * heightMap, float heightMultiplier)
+{
+	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
+	float* verts = new float[nrOfVertices];
+	int idx = 0;
+	for (int j = 0; j < verticesPerRow; j++) {
+		for (int k = 0; k < verticesPerRow; k++) {
+
+			verts[idx++] = heightMap[idx];
+
+			float heightCurveVal = heightCurve[(int)(heightMap[idx] * 10)];
+			verts[idx++] = heightMap[idx] * heightMultiplier * heightCurve[(int)(heightMap[idx]*10)];
+				
+			verts[idx++] = heightMap[idx];
+		}
 	}
 	return verts;
 }
@@ -160,9 +181,10 @@ float * Terrain::calculateVertexNormals(int * indices, float * surfaceNormals)
 	return vertexNormals;
 }
 
-void Terrain::updateTerrain(int octaves, float persistance, float lacunarity)
+void Terrain::updateTerrain(int octaves, float persistance, float lacunarity, float heightMultiplier)
 {
-	float * verts = generateVertices(octaves, persistance, lacunarity);
+	float * heightMap = generateHeightMap(octaves, persistance, lacunarity);
+	float * verts = generateVertices(heightMap, heightMultiplier);
 	int * indices = generateIndices();
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
@@ -170,6 +192,12 @@ void Terrain::updateTerrain(int octaves, float persistance, float lacunarity)
 
 	printf("Updated terrain \n");
 	glBindVertexArray(m_vao);
+
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_heightBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), heightMap, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(5, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+
 	// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ARRAY_BUFFER, m_positionBuffer);									// Set the newly created buffer as the current one
 	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), verts, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
@@ -190,10 +218,11 @@ void Terrain::updateTerrain(int octaves, float persistance, float lacunarity)
 
 }
 
-void Terrain::initTerrain(int octaves, float persistance, float lacunarity) {
+void Terrain::initTerrain(int octaves, float persistance, float lacunarity, float heightMultiplier) {
 	generator.generateSeedArray(tesselation);
 	int * indices = generateIndices();
-	float * verts = generateVertices(octaves, persistance, lacunarity);
+	float * heightMap = generateHeightMap(octaves, persistance, lacunarity);
+	float * verts = generateVertices(heightMap, heightMultiplier);
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
 	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
@@ -203,6 +232,12 @@ void Terrain::initTerrain(int octaves, float persistance, float lacunarity) {
 
 	glGenVertexArrays(1, &m_vao);
 	glBindVertexArray(m_vao);
+
+	glGenBuffers(1, &m_heightBuffer);													// Create a handle for the vertex position buffer
+	glBindBuffer(GL_ARRAY_BUFFER, m_heightBuffer);									// Set the newly created buffer as the current one
+	glBufferData(GL_ARRAY_BUFFER, verticesPerRow*verticesPerRow * 3 * sizeof(float), heightMap, GL_STATIC_DRAW);		// Send the vetex position data to the current buffer
+	glVertexAttribPointer(5, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(5);
 
 	glGenBuffers(1, &m_positionBuffer);													// Create a handle for the vertex position buffer
 	glBindBuffer(GL_ARRAY_BUFFER, m_positionBuffer);									// Set the newly created buffer as the current one

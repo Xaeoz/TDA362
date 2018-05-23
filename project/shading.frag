@@ -192,31 +192,38 @@ void main()
 	
 	//fragmentColor = vec4(shading, 1.0f);
 
-	if(normalize(positionOut).y < 0.16) {
-		fragmentColor = vec4(normalize(vec3(6, 80, 170)), 1.0f);
+	//Deep Water
+	if((positionOut).y < 0.16) {
+		fragmentColor = vec4((vec3(6, 80, 170)/vec3(255)), 1.0f);
 	}
 
-	if(normalize(positionOut).y > 0.15) {
-		fragmentColor = vec4(normalize(vec3(6, 162, 170)), 1.0f);
+	//Shallow Water
+	if((positionOut).y > 0.15) {
+		fragmentColor = vec4((vec3(6, 162, 170)/vec3(255)), 1.0f);
 	}
 
-	if(normalize(positionOut).y > 0.31) {
-		fragmentColor = vec4(normalize(vec3(165, 170, 6)), 1.0f);
+	//Sand
+	if((positionOut).y > 0.31) {
+		fragmentColor = vec4((vec3(232, 215, 111)/vec3(255)), 1.0f);
 	}
 
-	if(normalize(positionOut).y > 0.45) {
-		fragmentColor = vec4(normalize(vec3(6, 170, 9)), 1.0f);
+	//Green grass
+	if((positionOut).y > 0.45) {
+		fragmentColor = vec4((vec3(6, 170, 9)/vec3(255)), 1.0f);
 	}
 
-	if(normalize(positionOut).y > 0.6) {
-		fragmentColor = vec4(normalize(vec3(12, 81, 4)), 1.0f);
+	//Dark grass
+	if((positionOut).y > 0.6) {
+		fragmentColor = vec4((vec3(28, 104, 29)/vec3(255)), 1.0f);
 	}
 
-	if(normalize(positionOut).y > 0.75) {
-		fragmentColor = vec4(normalize(vec3(186, 184, 178)), 1.0f);
+	//Mountain
+	if((positionOut).y > 0.75) {
+		fragmentColor = vec4((vec3(186, 184, 178)/vec3(255)), 1.0f);
 	}
 
-	if(normalize(positionOut).y > 0.9) {
+	//Snow
+	if((positionOut).y > 0.9) {
 		fragmentColor = vec4(1.0, 1.0, 1.0, 1.0f);
 	}
 	

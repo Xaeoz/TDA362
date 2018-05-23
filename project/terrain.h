@@ -10,6 +10,7 @@ public:
 	int verticesPerRow;
 	int tesselation;
 	int triangleRestartIndex;
+	float * heightCurve;
 	HeightGenerator generator;
 	GLuint m_vao;
 	GLuint m_positionBuffer;
@@ -18,14 +19,16 @@ public:
 	GLuint m_numIndices;
 	GLuint m_texid_diffuse;
 	GLuint m_vertNormalBuffer;
+	GLuint m_heightBuffer;
 
 	std::string diffuseMapPath;
 
 
 	Terrain(int tesselation, HeightGenerator generator);
 
-	float * generateVertices(int octaves, float persistance, float lacunarity);
+	float * generateHeightMap(int octaves, float persistance, float lacunarity);
 
+	float * generateVertices(float * heightMap, float heightMultiplier);
 
 	float * generateTileTexCoords(int nrOfTiles);
 
@@ -35,9 +38,9 @@ public:
 
 	float * calculateVertexNormals(int * indices, float * surfaceNormals);
 
-	void updateTerrain(int octaves, float persistance, float lacunarity);
+	void updateTerrain(int octaves, float persistance, float lacunarity, float heightMultiplier);
 
-	void initTerrain(int octaves, float persistance, float lacunarity);
+	void initTerrain(int octaves, float persistance, float lacunarity, float heightMultiplier);
 
 	void submitTriangles(void);
 

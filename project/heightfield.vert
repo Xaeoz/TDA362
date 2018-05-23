@@ -5,6 +5,7 @@
 layout(location = 0) in vec3 position;
 layout(location = 2) in vec2 texCoordIn;
 layout(location = 4) in vec3 normalIn;
+layout(location = 5) in vec3 heightIn;
 layout(binding = 9) uniform sampler2D heightMap;
 layout(binding = 21) uniform sampler2D heightNormals;
 
@@ -44,7 +45,7 @@ void main()
 	viewSpacePosition = (modelViewMatrix * vec4(position.x, position.y, position.z, 1.0f)).xyz;
 	//viewSpacePosition = (modelViewMatrix * vec4(position.x, position.x, position.z, 1.0f)).xyz;
 	//positionOut = vec3(position*0.5 + vec3(0.5));
-	positionOut = position;
+	positionOut = heightIn;
 	//Needed to clip terrain from unecessary render passes
 	gl_ClipDistance[0] = dot(modelMatrix*vec4(position.x, position.y, position.z, 1.0f), clippingPlane);
 	texCoord = texCoordIn;
