@@ -19,6 +19,7 @@ add_executable ( project
     ParticleSystem.cpp
     Water.cpp
     terrain.cpp
+    HeightGenerator.cpp
     ${SHADERS}
     )
 

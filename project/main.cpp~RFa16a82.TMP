@@ -63,15 +63,14 @@ GLuint shaderProgram; // Shader for rendering the final image
 GLuint simpleShaderProgram; // Shader used to draw the shadow map
 GLuint backgroundProgram;
 GLuint heightShader;
-GLuint waterShaderProgram;
-GLuint particleShaderProgram;
+GLuint waterShader;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Water
 ///////////////////////////////////////////////////////////////////////////////
 Water water;
 
-ParticleSystem smokeParticleSystem;
+ParticleSystem smokeParticleSystem(100, vec3(0, 0, 0));
 
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
@@ -122,11 +121,9 @@ void loadShaders(bool is_reload)
 	shader = labhelper::loadShaderProgram("../project/background.vert", "../project/background.frag", is_reload);
 	if (shader != 0) backgroundProgram = shader;
 	shader = labhelper::loadShaderProgram("../project/water.vert", "../project/water.frag");
-	if (shader != 0) waterShaderProgram = shader;
+	if (shader != 0) waterShader = shader;
 	shader = labhelper::loadShaderProgram("../project/shading.vert", "../project/shading.frag", is_reload);
 	if (shader != 0) shaderProgram = shader;
-	shader = labhelper::loadShaderProgram("../project/particle.vert", "../project/particle.frag", is_reload);
-	if (shader != 0) particleShaderProgram = shader;
 }
 
 void initGL()
@@ -134,12 +131,12 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	//		Load Shaders
 	///////////////////////////////////////////////////////////////////////
-	backgroundProgram			= labhelper::loadShaderProgram("../project/background.vert",  "../project/background.frag");
-	shaderProgram				= labhelper::loadShaderProgram("../project/shading.vert",     "../project/shading.frag");
-	simpleShaderProgram			= labhelper::loadShaderProgram("../project/simple.vert",      "../project/simple.frag");
-	heightShader				= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag");
-	waterShaderProgram			= labhelper::loadShaderProgram("../project/water.vert",		  "../project/water.frag");
-	particleShaderProgram		= labhelper::loadShaderProgram("../project/particle.vert", "../project/particle.frag");
+	backgroundProgram   = labhelper::loadShaderProgram("../project/background.vert",  "../project/background.frag");
+	shaderProgram       = labhelper::loadShaderProgram("../project/shading.vert",     "../project/shading.frag");
+	simpleShaderProgram = labhelper::loadShaderProgram("../project/simple.vert",      "../project/simple.frag");
+	heightShader		= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag");
+	waterShader			= labhelper::loadShaderProgram("../project/water.vert",		  "../project/water.frag");
+
 	///////////////////////////////////////////////////////////////////////
 	// Load models and set up model matrices
 	///////////////////////////////////////////////////////////////////////
@@ -176,8 +173,6 @@ void initGL()
 	const float refractionY = 720;
 
 	water.init(waterYPos*worldUp, waterSize, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
-
-	smokeParticleSystem = *(new ParticleSystem(100, vec3(0, 0, 0)));
 
 	///////////////////////////////////////////////////////////////////////
 	// Load environment map
@@ -270,34 +265,27 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	water.m_moveFactor += WAVE_SPEED;
 	if (water.m_moveFactor >= 1.0f) water.m_moveFactor = 0;			//Reset counter if it passes 1.0f
 	//Set active shader program
-	glUseProgram(waterShaderProgram);
+	glUseProgram(waterShader);
 
 	glEnable(GL_BLEND);			//Enable alpha blending (used to smooth out water edges)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	//Setup data in shaders, for information on each field, refer to the shader
-	labhelper::setUniformSlow(waterShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * water.m_modelMatrix);
-	labhelper::setUniformSlow(waterShaderProgram, "moveFactor", water.m_moveFactor);
-	labhelper::setUniformSlow(waterShaderProgram, "cameraPosition", cameraPosition);
-	labhelper::setUniformSlow(waterShaderProgram, "modelMatrix", water.m_modelMatrix);
-	labhelper::setUniformSlow(waterShaderProgram, "globalLightPosition", globalLightPosition);
-	labhelper::setUniformSlow(waterShaderProgram, "globalLightColor", globalLightColor);
-	labhelper::setUniformSlow(waterShaderProgram, "globalLightDirection", globalLightDirection);
+	labhelper::setUniformSlow(waterShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * water.m_modelMatrix);
+	labhelper::setUniformSlow(waterShader, "moveFactor", water.m_moveFactor);
+	labhelper::setUniformSlow(waterShader, "cameraPosition", cameraPosition);
+	labhelper::setUniformSlow(waterShader, "modelMatrix", water.m_modelMatrix);
+	labhelper::setUniformSlow(waterShader, "globalLightPosition", globalLightPosition);
+	labhelper::setUniformSlow(waterShader, "globalLightColor", globalLightColor);
+	labhelper::setUniformSlow(waterShader, "globalLightDirection", globalLightDirection);
 	//These need to match the near and far plane of the current projection matrix
-	labhelper::setUniformSlow(waterShaderProgram, "nearPlane", 1.0f);
-	labhelper::setUniformSlow(waterShaderProgram, "farPlane", 2000.0f);
+	labhelper::setUniformSlow(waterShader, "nearPlane", 1.0f);
+	labhelper::setUniformSlow(waterShader, "farPlane", 2000.0f);
 	//Binds necessary textures, VAO, and index buffer, and then calls drawElements
 	water.render();
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	
 	glDisable(GL_BLEND);											//Disable blend again after rendering
-}
-
-void drawParticleSystem(const mat4 &viewMatrix, const mat4 &projectionMatrix)
-{
-	glUseProgram(particleShaderProgram);
-	labhelper::setUniformSlow(particleShaderProgram, "viewProjectionMatrix", projectionMatrix* viewMatrix );
-	smokeParticleSystem.render();
 }
 
 void drawQuad(float width, float height)
@@ -392,13 +380,6 @@ void display(void)
 	}
 
 	///////////////////////////////////////////////////////////////////////////
-	// Update particleSystem (This should happen in a logic main loop, but we have none
-	// so it goes here for now!)
-	///////////////////////////////////////////////////////////////////////////
-	smokeParticleSystem.process_particles(deltaTime);
-
-
-	///////////////////////////////////////////////////////////////////////////
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
 
@@ -456,11 +437,10 @@ void display(void)
 	glClearColor(0,0,0,1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	//drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
+	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
 
 	
-	//drawWater(viewMatrix, projMatrix);
-	drawParticleSystem(viewMatrix, projMatrix);
+	drawWater(viewMatrix, projMatrix);
 	//drawQuad(0.5f, 0.5f);
 
 
