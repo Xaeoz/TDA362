@@ -10,6 +10,7 @@
 #include <math.h>
 
 using namespace glm;
+using namespace std;
 using std::string;
 using std::vector;
 
@@ -20,7 +21,7 @@ HeightGenerator::HeightGenerator(int tesselation)
 	,dist()
 	,seedArray()
 	,tesselation(tesselation)
-	,start(54)
+	,start(95)
 {
 	//Generate seed for rng so that we can generate a new seed
 	rng.seed(std::random_device()());
@@ -29,7 +30,7 @@ HeightGenerator::HeightGenerator(int tesselation)
 	//Generate new seed for later use
 	seed = dist(rng);
 	//Generate seed array
-	generateSeedArray(tesselation*4);
+	generateSeedArray(10000);
 }
 
 void HeightGenerator::setTesselation(int tesselationIn) 
@@ -104,10 +105,11 @@ void HeightGenerator::generateSeedArray(int size) {
 
 void HeightGenerator::generatePerlinNoise(int size, int nOctaves, float* outputArray, float persistance, float lacunarity, float start)
 {
+	fill_n(outputArray, size, 0); //clear array of old values in-case it is a reassignment
 	int rowLength = sqrt(size);
 	int scale = 2;
 	start = (int)start % rowLength;
-	printf("start: %i \n", start);
+	//printf("start: %i \n", start);
 	float maxNoise = -999999;
 	float minNoise = 999999;
 	int * octaveOffsets = new int[nOctaves * 2];

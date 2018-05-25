@@ -19,8 +19,8 @@ using namespace glm;
 
 #include <Model.h>
 #include "hdr.h"
-#include "HeightGenerator.h"
 #include "terrain.h"
+#include "endlessTerrain.h"
 
 
 
@@ -38,18 +38,21 @@ float previousTime = 0.0f;
 float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
-int octaves = 4;
-float persistance = .7f;
-float lacunarity = 2.3f;
 
-//int tesselation = 262144;
-int size = 350;
-float heightMultiplier = 1;
-int tesselation = ((size/6)*2)*((size/6)*2);
-//int tesselation = 2000;
-HeightGenerator heightGenerator(tesselation);
-Terrain terrain(tesselation, heightGenerator);
+int chunkSize = 1000;
+float maxViewDistance = 4000;
+float heightMultiplier = 300;
+int tesselation = 1800;
 
+static const int PERLIN_NOISE_ARRAY_SIZES[] =
+{
+	64,
+	600,
+	900,
+	1600,
+	3600,
+	4000
+};
 
 //TODO: Remove this in favour of utilizing illumination map in the shaders
 //Global Light (the sun)
@@ -96,9 +99,9 @@ float point_light_intensity_multiplier = 100.0f;
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
 //vec3 cameraPosition(-270.0f, 300.0f, 70.0f);
-vec3 cameraPosition(0.0f, 50.0f, 70.0f);
+vec3 cameraPosition(1.0f, 100.0f, 100.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-float cameraSpeed = 10.0f;
+float cameraSpeed = 1.0f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -113,6 +116,10 @@ mat4 roomModelMatrix;
 mat4 landingPadModelMatrix; 
 mat4 fighterModelMatrix;
 mat4 terrainModelMatrix;
+
+EndlessTerrain endlessTerrain(chunkSize, maxViewDistance, tesselation);
+
+
 
 void loadShaders(bool is_reload)
 {
@@ -149,9 +156,9 @@ void initGL()
 
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
-	vec3 scaleFactor = vec3(size*5, 1, size*5); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, 0.0f, -1.0f));
-	terrain.initTerrain(octaves, persistance, lacunarity, heightMultiplier);
+	vec3 scaleFactor = vec3(chunkSize *1, 1, chunkSize *1); //Use this to scale the map
+	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(0.0f, 0.0f, 0.0f));
+	//terrain.initTerrain(octaves, persistance, lacunarity, heightMultiplier);
 
 
 
@@ -188,12 +195,13 @@ void initGL()
 	std::string heightFieldTexture = "../res/wildgrass.png";
 	std::string heightFieldNormals = "../res/NormalMap.png";
 	//terrain.loadHeightField(heightFieldFilePath);
-	terrain.loadDiffuseTexture(heightFieldTexture);
+	//terrain.loadDiffuseTexture(heightFieldTexture);
 	//terrain.loadNormalMap(heightFieldNormals);
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
 	glEnable(GL_CULL_FACE);		// enables backface culling
 	glEnable(GL_CLIP_DISTANCE0); //Enable clipping plane 0 for use in vertex shaders
+	
 
 
 }
@@ -348,7 +356,9 @@ void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm
 	labhelper::setUniformSlow(heightShader, "material_emission", .5f);
 	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
 	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
-	terrain.submitTriangles();
+	//terrain.submitTriangles();
+
+	endlessTerrain.updateVisibleChunks(cameraPosition);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -495,60 +505,21 @@ bool handleEvents(void)
 	if (state[SDL_SCANCODE_E]) {
 		cameraPosition += cameraSpeed * worldUp;
 	}
-	if (state[SDL_SCANCODE_P]) {
-		terrain.initTerrain(octaves, persistance, lacunarity, heightMultiplier);
-	}
-	if (state[SDL_SCANCODE_Z]) {
-		if(persistance >= 0.2) persistance -= 0.1;
-		printf("persistance: %f \n", persistance);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
-	}
-	if (state[SDL_SCANCODE_X]) {
-		if (persistance <= 2.9) persistance += 0.1;
-		printf("persistance: %f \n", persistance);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
-	}
-	if (state[SDL_SCANCODE_C]) {
-		if (lacunarity > 1.0f) lacunarity -= .5f;
-		printf("lacunarity: %f \n", lacunarity);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
-	}
-	if (state[SDL_SCANCODE_V]) {
-		if (lacunarity < 10.0f) lacunarity += .5f;
-		printf("lacunarity: %f \n", lacunarity);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
-	}
-	if (state[SDL_SCANCODE_B]) {
-		if (octaves >= 2) octaves -= 1;
-		printf("octaves: %i \n", octaves);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
-	}
-	if (state[SDL_SCANCODE_N]) {
-		if (octaves <= sqrt(tesselation)) octaves += 1;
-		printf("octaves: %i \n", octaves);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
-	}
 
-	if (state[SDL_SCANCODE_J]) {
-		terrain.generator.start += 0.33;
-		printf("start: %f \n", terrain.generator.start);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
+	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_z)) {
+		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams);
 	}
-	if (state[SDL_SCANCODE_H]) {
-		terrain.generator.start -= 0.33;
-		printf("start: %f \n", terrain.generator.start);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
+	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_x)) {
+		endlessTerrain.generator.generateSeedArray(endlessTerrain.pparams->seedArraySize);
+		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams);
 	}
-	if (state[SDL_SCANCODE_G]) {
-		heightMultiplier += 10.00;
-		printf("start: %f \n", heightMultiplier);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
+	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_l)) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
 	}
-	if (state[SDL_SCANCODE_F]) {
-		if(heightMultiplier > 10)
-			heightMultiplier -= 10.00;
-		printf("start: %f \n", heightMultiplier);
-		terrain.updateTerrain(octaves, persistance, lacunarity, heightMultiplier);
+	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_o)) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
 	}
 	return quitEvent;
 }
@@ -559,8 +530,23 @@ void gui()
 	ImGui_ImplSdlGL3_NewFrame(g_window);
 
 	// ----------------- Set variables --------------------------
+	ImGui::Text("Endless Terrain, press Z to activate changes, press X to generate new terrain");
+	//ImGui::RadioButton("None", &currentEffect, PostProcessingEffect::None);
+	//ImGui::SameLine();
+	ImGui::SliderInt("Octaves", &endlessTerrain.pparams->octaves, 1, 8);
+	ImGui::SliderFloat("Persistance", &endlessTerrain.pparams->persistance, 0.1, 2.0);
+	ImGui::SliderFloat("Lacunarity", &endlessTerrain.pparams->lacunarity, 0.1, 3.0);
+	ImGui::SliderFloat("Height Multiplier", &endlessTerrain.pparams->heightMultiplier, 1.0, 1000.0);
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::Text("Perlin Noise Array Size");
+	ImGui::RadioButton("64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	
+	ImGui::RadioButton("600", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[1]);
+	ImGui::RadioButton("900", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[2]);
+	ImGui::RadioButton("1600", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[3]);
+	ImGui::RadioButton("3600", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[4]);
+	ImGui::RadioButton("4000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[5]);
 	// ----------------------------------------------------------
+
 	// Render the GUI.
 	ImGui::Render();
 }

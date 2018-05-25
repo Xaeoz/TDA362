@@ -12,10 +12,9 @@ using namespace glm;
 using std::string;
 using std::vector;
 
-Terrain::Terrain(int tesselation, HeightGenerator generator)
+Terrain::Terrain(vec2 originCoord, int tesselation, int meshSimplificationFactor, int chunkSize)
 	: verticesPerRow(0)
 	, tesselation(tesselation)
-	, generator(generator)
 	, m_vao(UINT32_MAX)
 	, m_positionBuffer(UINT32_MAX)
 	, m_uvBuffer(UINT32_MAX)
@@ -24,61 +23,108 @@ Terrain::Terrain(int tesselation, HeightGenerator generator)
 	, triangleRestartIndex(0)
 	, m_texid_diffuse(UINT32_MAX)
 	, diffuseMapPath("")
+	, meshSimplificationFactor(0)
 	, heightCurve()
+	, meshSimplificationFactors()
+	, baseTesselation(tesselation)
+	, generator(tesselation)
+	, originCoord(originCoord)
+	, visible(false)
+	, seen(false)
 {
-	verticesPerRow = (sqrt(tesselation / 2) + 1);
+
 	triangleRestartIndex = 9999999;
-	heightCurve = new float[10]{ .0f,  .0f,  .0f,  .3f, .4f, .5f, .6f, .7f, .8f, .9f };
+	heightCurve = new float[11]{ .0f,  .0f,  .0f,  .1f, .3f, .4f, .5f, .6f, .8f, .9f, 1.0f };
+	meshSimplificationFactors = new int[7]{ 0,1,2,3,4,5,6 };
+	setLod(baseTesselation, meshSimplificationFactor, chunkSize);
 }
 
-float* Terrain::generateHeightMap(int octaves, float persistance, float lacunarity)
+void Terrain::setLod(int tesselation, int meshSimplificationFactor, int chunkSize) {
+	int factor = meshSimplificationFactors[meshSimplificationFactor] * 4;
+	if (factor == 0) factor = 1;
+	tesselation = tesselation / factor;
+	if (tesselation < baseTesselation / (factor)) tesselation = baseTesselation / (24); //Check so that we dont go to far
+	verticesPerRow = sqrt(tesselation/2)+1;
+}
+
+void Terrain::decreaseLod(void)
+{
+	int factor = meshSimplificationFactors[meshSimplificationFactor] * 4;
+	if (factor == 0) factor = 1;
+	tesselation = tesselation / factor;
+	if (tesselation < baseTesselation/(factor)) tesselation = baseTesselation / (24); //Check so that we dont go to far
+	verticesPerRow = (sqrt((tesselation) / 2) + 1); 
+
+}
+
+void Terrain::increaseLod(void)
+{
+	int factor = meshSimplificationFactors[meshSimplificationFactor] * 4;
+	if (factor == 0) {
+		tesselation *= 1;
+	}
+	else {
+		tesselation = tesselation * factor;
+	}
+	if (tesselation > baseTesselation) tesselation = baseTesselation; //Check so that we dont go to far
+	verticesPerRow = (sqrt((tesselation) / 2) + 1);
+
+}
+
+float* Terrain::generateHeightMap(float * perlinNoise, int perlinNoiseSize)
 {
 	float* heightMap = NULL;
-	float vertexDistance = 2.0f / float(verticesPerRow - 1);
+	float vertexDistance = 1.0f / float(verticesPerRow - 1);
 	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
+	int rowLength = sqrt(perlinNoiseSize);
 	heightMap = new float[nrOfVertices];
+	int yOffset = ((int)originCoord.y * rowLength * (rowLength-(verticesPerRow-1))) % perlinNoiseSize + perlinNoiseSize;
+	int xOffset = ((int)originCoord.x * (verticesPerRow-1)) % rowLength + rowLength;
 
-	float * perlinNoise = new float[nrOfVertices / 3];
-	generator.generatePerlinNoise(nrOfVertices / 3, octaves, perlinNoise, persistance, lacunarity, generator.start);
-	//generator.generatePerlinNoise2(nrOfVertices / 3, octaves, perlinNoise, 0.8, generator.start);
 
-	float z = 2;
+	float z = 1;
 	int idx = 0;
+	
 	for (int j = 0; j < verticesPerRow; j++) {
 		float x = 0;
 		for (int k = 0; k < verticesPerRow; k++) {
 			heightMap[idx++] = x;
-			heightMap[idx++] = perlinNoise[j*verticesPerRow + k];
+			int temp = ((yOffset + j*rowLength) % perlinNoiseSize) + (k + xOffset) % (rowLength);
+			heightMap[idx++] = perlinNoise[((yOffset + j*rowLength) % perlinNoiseSize) + (k + xOffset) % (rowLength)];
 			heightMap[idx++] = z;
 			x += vertexDistance;
 		}
 		z -= vertexDistance;
 	}
 	return heightMap;
-
 }
 
 float* Terrain::generateVertices(float * heightMap, float heightMultiplier)
 {
 	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
 	float* verts = new float[nrOfVertices];
+	float vertexDistance = 1.0f / float(verticesPerRow - 1);
+
 	int idx = 0;
+	float z = originCoord.y +1.0f;
 	for (int j = 0; j < verticesPerRow; j++) {
+		float x = originCoord.x;
 		for (int k = 0; k < verticesPerRow; k++) {
 
-			verts[idx++] = heightMap[idx];
-
-			float heightCurveVal = heightCurve[(int)(heightMap[idx] * 10)];
+			verts[idx++] = x;
+			float heightCurveVal = heightCurve[(int)(heightMap[idx] * 10)]; //for debugging
+			float heightVal = heightMap[idx];
 			verts[idx++] = heightMap[idx] * heightMultiplier * heightCurve[(int)(heightMap[idx]*10)];
-				
-			verts[idx++] = heightMap[idx];
+			verts[idx++] = z;
+			x += vertexDistance;
 		}
+		z -= vertexDistance;
 	}
 	return verts;
 }
 
 float* Terrain::generateTileTexCoords(int nrOfTiles) {
-	//Generate tile texcoords
+	//Generate tile texcoordss
 	float* tileTexCoords = NULL;
 	tileTexCoords = new float[verticesPerRow*verticesPerRow * 2];
 	float vt = 1.0f * nrOfTiles;
@@ -107,9 +153,7 @@ int* Terrain::generateIndices(void) {
 
 			indices[idx++] = (r + 1) * columns + c;
 			indices[idx++] = r * columns + c;
-			//if (r == rows - 1) {
-			//	indices[idx] = (r + 1) * columns + c - 1;
-			//}
+
 		}
 
 		if (r < rows - 1) {
@@ -181,9 +225,9 @@ float * Terrain::calculateVertexNormals(int * indices, float * surfaceNormals)
 	return vertexNormals;
 }
 
-void Terrain::updateTerrain(int octaves, float persistance, float lacunarity, float heightMultiplier)
+void Terrain::updateTerrain(float heightMultiplier, float * perlinNoise, int perlinNoiseSize )
 {
-	float * heightMap = generateHeightMap(octaves, persistance, lacunarity);
+	float * heightMap = generateHeightMap(perlinNoise, perlinNoiseSize);
 	float * verts = generateVertices(heightMap, heightMultiplier);
 	int * indices = generateIndices();
 	float * tileTexCoords = generateTileTexCoords(16);
@@ -218,17 +262,17 @@ void Terrain::updateTerrain(int octaves, float persistance, float lacunarity, fl
 
 }
 
-void Terrain::initTerrain(int octaves, float persistance, float lacunarity, float heightMultiplier) {
-	generator.generateSeedArray(tesselation);
+void Terrain::initTerrain(float heightMultiplier, float * perlinNoise, int perlinNoiseSize, int chunkSize) {
+
 	int * indices = generateIndices();
-	float * heightMap = generateHeightMap(octaves, persistance, lacunarity);
+	float * heightMap = generateHeightMap(perlinNoise, perlinNoiseSize);
 	float * verts = generateVertices(heightMap, heightMultiplier);
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
 	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
 
-	printf("Vertices Per Row: %i \n", verticesPerRow);
-	printf("Number of indices: %i \n", m_numIndices);
+	//printf("Vertices Per Row: %i \n", verticesPerRow);
+	//printf("Number of indices: %i \n", m_numIndices);
 
 	glGenVertexArrays(1, &m_vao);
 	glBindVertexArray(m_vao);
@@ -279,8 +323,8 @@ void Terrain::submitTriangles(void)
 
 	/*glActiveTexture(GL_TEXTURE9);
 	glBindTexture(GL_TEXTURE_2D, m_texid_hf);*/
-	glActiveTexture(GL_TEXTURE20);
-	glBindTexture(GL_TEXTURE_2D, m_texid_diffuse);
+	/*glActiveTexture(GL_TEXTURE20);
+	glBindTexture(GL_TEXTURE_2D, m_texid_diffuse);*/
 	/*glActiveTexture(GL_TEXTURE21);
 	glBindTexture(GL_TEXTURE_2D, m_texid_normal);*/
 

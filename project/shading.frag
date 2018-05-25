@@ -232,7 +232,7 @@ void main()
 	//fragmentColor = vec4(positionOut.x, 1.0, positionOut.z, 1.0);
 	//watch noise array
 	
-	//fragmentColor = vec4(vec3((positionOut).y), 1.0f);
+	//fragmentColor = vec4(vec3(positionOut), 1.0f);
 	return;
 
 }
