@@ -8,6 +8,7 @@ layout(location = 2) in vec2 ageMaxAge;
 
 uniform mat4 viewMatrix;
 uniform mat4 viewProjectionMatrix;
+uniform mat4 modelViewProjectionMatrix;
 uniform int atlasRows;
 
 

@@ -19,9 +19,9 @@ layout(binding = 0) uniform sampler2D textureAtlas;
 layout(binding = 1) uniform sampler2D depthMap;
 
 const float blendStrength = 2;
-const float fadeDistance = 1.0f;
-const float fadeStrength = 1.0f;
-const float lifeFadeThreshold = 0.8f; //Ratio at which fragments start fading because of long life
+const float fadeDistance = 7.0f;
+const float fadeStrength = 2.0f;
+const float lifeFadeThreshold = 0.9f; //Ratio at which fragments start fading because of long life
 void main()
 {
 
