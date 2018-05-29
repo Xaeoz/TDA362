@@ -1,7 +1,6 @@
 
 
 #include "ThirdPersonCamera.h"
-#include <iostream>
 #ifdef _WIN32
 extern "C" _declspec(dllexport) unsigned int NvOptimusEnablement = 0x00000001;
 #endif
@@ -82,7 +81,6 @@ ParticleSystem fogParticleSystem;
 FboInfo preParticleFB;
 
 vec3 lastShipPosition;
-float shipVelocity;
 
 ////////////////////////////////////////////////////////////////////////////////
 // 3rd Person Camera
@@ -207,7 +205,7 @@ void initGL()
 	int systemSize = 10000;
 
 	//Note: ship is facing in negative x-direction (issue with model)
-	const vec3 smokeOffset = vec3(19.0f, 1.3f, 0); //How much offset the smoke should have from the origin position of the ship
+	const vec3 smokeOffset = vec3(15.0f, 1.0f, 0); //How much offset the smoke should have from the origin position of the ship
 	vec3 startingPos = vec3(smokeOffset.x + fighterModelMatrix[3].x, smokeOffset.y + fighterModelMatrix[3].y, smokeOffset.z + fighterModelMatrix[3].z);
 	float spawnTime = 0.04f;
 
@@ -217,7 +215,6 @@ void initGL()
 	/*const std::string textureAtlasPath = "../res/smoke_atlas.png";
 	const int atlasRows = 4;*/
 
-	//Initialize the particle system with given parameters
 	smokeParticleSystem = *(new ParticleSystem(systemSize, startingPos, smokeOffset, spawnTime, textureAtlasPath, atlasRows));
 
 
@@ -262,7 +259,6 @@ vec3 getFighterPosition()
 	return vec3(fighterModelMatrix[3].x, fighterModelMatrix[3].y, fighterModelMatrix[3].z);
 }
 
-//Gets camera position for either 3rd person or 1st person cam based on flag
 vec3 getActiveCameraPosition()
 {
 	if (thirdPersonCameraActive)
@@ -274,7 +270,6 @@ vec3 getActiveCameraPosition()
 	return cameraPosition;
 }
 
-//This is a bit odd, not sure it completely works
 vec3 getActiveLookAtTarget()
 {
 	if(thirdPersonCameraActive)
@@ -286,21 +281,22 @@ vec3 getActiveLookAtTarget()
 	return cameraPosition + cameraDirection;
 }
 
-
-//Sent as a parameter to particle system
-//Used to calculate the speed of each particle, which allows for randomization within a particle system
-vec3 calculateSmokeVelocity(mat4 parentModelMatrix, float shipSpeed, float speed)
+vec3 calculateSmokeVelocity(vec3 shipDirection, float shipSpeed, float speed)
 {
-	vec3 shipDirection = vec3(-parentModelMatrix[0][0], parentModelMatrix[1][0], parentModelMatrix[2][0]);
-	vec3 baseVelocity = -shipDirection * (speed-shipSpeed);
-	baseVelocity = vec3(0);
-	vec3 scatteringY = vec3(parentModelMatrix[0][1], parentModelMatrix[1][1], parentModelMatrix[2][1]) * (((rand() % 1000) /100.0f) - 5.0f);
-	vec3 scatteringZ = vec3(-parentModelMatrix[0][2], parentModelMatrix[1][2], parentModelMatrix[2][2]) * (((rand() % 1000) / 100.0f) - 5.0f);
-	return baseVelocity + scatteringY + scatteringZ;
+
+	vec3 baseVelocity = -shipDirection * speed;
+
+	return baseVelocity;
 }
 
+vec3 calculateFogVelocity(vec3 nope, float speed)
+{
 
-//Draw the debug light and its beautiful line
+	vec3 baseVelocity = vec3((rand() % 300) / 300.0f);
+
+	return baseVelocity;
+}
+
 void debugDrawLight(const glm::mat4 &viewMatrix, const glm::mat4 &projectionMatrix, const glm::vec3 &worldSpaceLightPos)
 {
 	mat4 modelMatrix = glm::translate(worldSpaceLightPos);
@@ -312,7 +308,6 @@ void debugDrawLight(const glm::mat4 &viewMatrix, const glm::mat4 &projectionMatr
 }
 
 
-//Draw the cubemap background
 void drawBackground(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	glUseProgram(backgroundProgram);
@@ -322,7 +317,6 @@ void drawBackground(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	labhelper::drawFullScreenQuad();
 }
 
-//Draw the basic scene models
 void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix, const glm::vec4 clipPlane)
 {
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
@@ -362,7 +356,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	
 }
 
-//Setup the water shader params and render the water quad
 void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	water.m_moveFactor += WAVE_SPEED;
@@ -391,7 +384,6 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	glDisable(GL_BLEND);											//Disable blend again after rendering
 }
 
-//Draw the particle system using the preParticleFB depthbuffer to create "softness"
 void drawParticleSystem(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	glUseProgram(particleShaderProgram);
@@ -418,8 +410,6 @@ void drawParticleSystem(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	glEnable(GL_DEPTH_TEST);
 }
 
-
-//draw a quad on top of the window (Only used for early debuggin, but keeping it here for now)
 void drawQuad(float width, float height)
 {
 
@@ -451,7 +441,6 @@ void drawQuad(float width, float height)
 	
 }
 
-//Sets up the terrain shader params, updates internal visibility and then draws the terrain
 void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm::vec4 clipPlane)
 {
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
@@ -498,7 +487,6 @@ void drawSinglePassScene(GLuint currentShaderProgram, const mat4 &viewMatrix, co
 	debugDrawLight(viewMatrix, projectionMatrix, vec3(lightPosition));
 }
 
-//Draws everything in the preParticleFB to the screen in a fullscreen quad (Prevents having to re-rasterize and re-shade the scene)
 void drawPostProcessedQuad()
 {
 	glUseProgram(postProcessShaderProgram);
@@ -532,25 +520,14 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 
 	//Fighter model for some reason looks into the negative x-direction, so its forwards is -x rather than z
-	
+	vec3 shipDirection = vec3(-fighterModelMatrix[0][0], fighterModelMatrix[1][0], fighterModelMatrix[2][0]);
 	vec3 shipMovement = fighterModelMatrix[3];
 	shipMovement = shipMovement - lastShipPosition;
-	//float shipVelocity = length(shipMovement)/deltaTime;
-
-	float speed = 40;
-	//Smoketrail system position update
+	float shipVelocity = length(shipMovement)/deltaTime;
+	float speed = 15;
+	//Smoketrail system update
 	smokeParticleSystem.update(fighterModelMatrix);
-
-	if(shipVelocity < 0.001 && shipVelocity > -0.001f)
-	{
-		smokeParticleSystem.m_spawnTime = 0.0f;
-	}else
-	{
-		smokeParticleSystem.m_spawnTime = 0.025f / shipVelocity;
-	}
-	
-	//Update all particles in the system
-	smokeParticleSystem.process_particles(deltaTime, getActiveCameraPosition(), &calculateSmokeVelocity, fighterModelMatrix, shipVelocity, speed);
+	smokeParticleSystem.process_particles(deltaTime, getActiveCameraPosition(), &calculateSmokeVelocity, shipDirection, shipVelocity, speed);
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -567,7 +544,7 @@ void display(void)
 	{
 		thirdPersonCamera.updateCamera(fighterModelMatrix);
 		//Look at the fighter!
-		viewMatrix = lookAt(getActiveCameraPosition(), vec3(fighterModelMatrix[3].x, fighterModelMatrix[3].y, fighterModelMatrix[3].z), worldUp);
+		viewMatrix = lookAt(getActiveCameraPosition(), vec3(fighterModelMatrix[3].x, fighterModelMatrix[3].y, fighterModelMatrix[3].z), worldUp /*vec3(-fighterModelMatrix[0].y, fighterModelMatrix[1].y, fighterModelMatrix[2].y)*/ );
 	}
 
 	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);
@@ -631,9 +608,7 @@ void display(void)
 	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
 	drawWater(viewMatrix, projMatrix);
 
-	///////////////////////////////////////////////////////////////////////////
-	// Draw from camera to pre-particle-buffer
-	///////////////////////////////////////////////////////////////////////////
+	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClearColor(0, 0, 0, 1.0);
@@ -644,8 +619,6 @@ void display(void)
 
 	drawParticleSystem(viewMatrix, projMatrix);
 	//drawQuad(0.5f, 0.5f);
-
-	lastShipPosition = fighterModelMatrix[3];
 
 } 
 
@@ -703,27 +676,23 @@ bool handleEvents(void)
 		{
 			vec3 totalMovement = fighterSpeed * deltaTime * vec3(-1, 0, 0);
 			fighterModelMatrix = fighterModelMatrix* translate(totalMovement);
-			shipVelocity = fighterSpeed;
+			
 		}else
 		{
 			cameraPosition += cameraSpeed * cameraDirection;
 		}
 		
 	}
-	else if (state[SDL_SCANCODE_S]) {
+	if (state[SDL_SCANCODE_S]) {
 		if (thirdPersonCameraActive)
 		{
 			vec3 totalMovement = fighterSpeed * deltaTime * vec3(1, 0, 0);
 			fighterModelMatrix = fighterModelMatrix * translate(totalMovement);
-			shipVelocity = fighterSpeed;
 		}
 		else
 		{
 			cameraPosition -= cameraSpeed * cameraDirection;
 		}
-	} else
-	{
-		shipVelocity = 0.0f;
 	}
 	if (state[SDL_SCANCODE_A]) {
 		if (thirdPersonCameraActive)

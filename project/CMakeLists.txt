@@ -20,6 +20,7 @@ add_executable ( project
     Water.cpp
     terrain.cpp
     HeightGenerator.cpp
+    ThirdPersonCamera.cpp
     ${SHADERS}
     )
 
