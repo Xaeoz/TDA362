@@ -24,10 +24,10 @@ uniform float farPlane;
 uniform float nearPlane;
 
 
-const float waveStrength = 0.005;				//Strength of the distortions to the textures
+const float waveStrength = 0.0005;				//Strength of the distortions to the textures
 const float fresnelWeight = 2.0f;				//Controls reflection and refraction blending ( >1 means more reflective, <1 means more refractive)
 const float shineDamper = 25.0;					//Exponent to damp the specular shine
-const float noTransparencyDepth = 5.0f;	//The depth at which the water should be rendered fully rather than alpha blending
+const float noTransparencyDepth = 10.0f;	//The depth at which the water should be rendered fully rather than alpha blending
 
 //Reflectivity of the water (higher means more angles result in specular highlights, 
 //lower means camera need to be close to perfect reflection angle for highlights to appear
@@ -51,6 +51,9 @@ void main()
 	float waterSurfaceDepth = 2.0*nearPlane*farPlane/ (farPlane + nearPlane - (2.0 * surfaceDepth - 1.0) * (farPlane-nearPlane));			//Calculation found online, do not alter unless necessary
 	//Finally calculate the actual depth
 	float waterDepth = waterFloorDepth - waterSurfaceDepth;
+	waterDepth -=1.0f;
+	if(waterDepth < 0)
+		waterDepth = 0;
 
 
 
@@ -64,11 +67,11 @@ void main()
 	totalDistortion *= clamp(waterDepth/noTransparencyDepth, 0, 1);													//Reduce distortion on fragments with low depth
 
 	reflectionCoords+= totalDistortion;
-	//reflectionCoords.x = clamp(reflectionCoords.x, 0.001, 0.999); //Don't let the distortion go outside the texture
-	//reflectionCoords.y = clamp(reflectionCoords.y, -0.999, -0.001);
+	reflectionCoords.x = clamp(reflectionCoords.x, 0.001, 0.999); //Don't let the distortion go outside the texture
+	reflectionCoords.y = clamp(reflectionCoords.y, -0.999, -0.001);
 
 	refractionCoords+= totalDistortion;  
-	//refractionCoords = clamp(refractionCoords, 0.001, 0.999);
+	refractionCoords = clamp(refractionCoords, 0.001, 0.999);
 
 	vec4 reflectionColor = texture2D(reflectionTexture, reflectionCoords);
 	vec4 refractionColor = texture2D(refractionTexture, refractionCoords);
@@ -102,6 +105,7 @@ void main()
 	fragmentColor = mix(fragmentColor, vec4(0.0, 0.3, 0.5, 1.0), 0.3) + vec4(specularHighlights, 0.0f);
 
 	//Fade out water close to edges of things sticking out
-	fragmentColor.a = clamp(waterDepth/noTransparencyDepth, 0, 1);
-	//fragmentColor = vec4(waterDepth/50.0);
+	fragmentColor.a = clamp(pow(waterDepth/noTransparencyDepth, 3), 0, 1);
+
+	//fragmentColor = vec4(vec3(pow(waterDepth/5.0, 5.0f)), 1);
 }

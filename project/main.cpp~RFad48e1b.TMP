@@ -55,7 +55,7 @@ static const int PERLIN_NOISE_ARRAY_SIZES[] =
 	2000*2000
 };
 
-float farPlane = 4000.f;
+float farPlane = 30000.f;
 
 //TODO: Remove this in favour of utilizing illumination map in the shaders
 //Global Light (the sun)
@@ -226,15 +226,15 @@ void initGL()
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
 	const float waterYPos = 30.0f;
-	const float waterSize = 20000.0f;
+	const float waterSize = 200000.0f;
 
 	//Reflection map resolution (higher is better and slower)
 	const float reflectionX = 1280;
 	const float reflectionY = 720;
 
 	//Refraction map resolution (higher is better and slower)
-	const float refractionX = 1920;
-	const float refractionY = 1080;
+	const float refractionX = 1280;
+	const float refractionY = 720;
 
 	water.init(waterYPos*worldUp, waterSize, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
 
@@ -417,7 +417,7 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightDirection", globalLightDirection);
 	//These need to match the near and far plane of the current projection matrix
 	labhelper::setUniformSlow(waterShaderProgram, "nearPlane", 1.0f);
-	labhelper::setUniformSlow(waterShaderProgram, "farPlane", farPlane);
+	labhelper::setUniformSlow(waterShaderProgram, "farPlane", 4000.0f);
 	//Binds necessary textures, VAO, and index buffer, and then calls drawElements
 	water.render();
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -436,7 +436,7 @@ void drawParticleSystem(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	labhelper::setUniformSlow(particleShaderProgram, "viewProjectionMatrix", projectionMatrix* viewMatrix );
 	labhelper::setUniformSlow(particleShaderProgram, "atlasRows", smokeParticleSystem.m_atlasRows);
 	labhelper::setUniformSlow(particleShaderProgram, "nearPlane", 1.0f);
-	labhelper::setUniformSlow(particleShaderProgram, "farPlane", farPlane);
+	labhelper::setUniformSlow(particleShaderProgram, "farPlane", 4000.0f);
 
 	//Bind preprocessed depthbuffer to be able to create soft particles
 	glActiveTexture(GL_TEXTURE1);
@@ -524,7 +524,7 @@ void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm
 	labhelper::setUniformSlow(heightShader, "baseColourStrengths", materialsCount, baseColourStrengths);
 	labhelper::setUniformSlow(heightShader, "baseTextureScales", materialsCount, baseTextureScales);
 
-	endlessTerrain.updateVisibleChunks(getActiveCameraPosition());
+	endlessTerrain.updateVisibleChunks(cameraPosition);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -538,27 +538,14 @@ void drawSinglePassScene(GLuint currentShaderProgram, const mat4 &viewMatrix, co
 	debugDrawLight(viewMatrix, projectionMatrix, vec3(lightPosition));
 }
 
-bool showRefraction = false;
-
 //Draws everything in the preParticleFB to the screen in a fullscreen quad (Prevents having to re-rasterize and re-shade the scene)
 void drawPostProcessedQuad()
 {
 	glUseProgram(postProcessShaderProgram);
-	if (showRefraction) {
-		
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, preParticleFB.colorTextureTargets[0]);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, preParticleFB.depthBuffer);
-	}else
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, water.m_refractionFbo.colorTextureTargets[0]);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, water.m_refractionFbo.depthBuffer);
-	}
-
-	
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, preParticleFB.colorTextureTargets[0]);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, preParticleFB.depthBuffer);
 	labhelper::drawFullScreenQuad();
 }
 
@@ -603,7 +590,7 @@ void display(void)
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
 
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 2.0f, float(farPlane));
+	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, float(farPlane));
 
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
@@ -664,7 +651,7 @@ void display(void)
 	glViewport(0, 0, water.m_refractionFbo.width, water.m_refractionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//Offset the clipping plane slightly above the water to avoid black artefact lines along intersections with shallow terrain
-	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y + 1.0f));
+	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y+1));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera to pre-particle-buffer
@@ -771,7 +758,6 @@ bool handleEvents(void)
 	if(state[SDL_SCANCODE_SPACE])
 	{
 		shipVelocity = 100.0f;
-		showRefraction = !showRefraction;
 	}
 	if (state[SDL_SCANCODE_A]) {
 		if (thirdPersonCameraActive)
@@ -866,8 +852,8 @@ void gui()
 	ImGui::SliderFloat("Height Multiplier", &endlessTerrain.pparams->heightMultiplier, 1.0, 10000.0);
 	ImGui::SliderFloat("Sample start offset", &endlessTerrain.pparams->perlinSamplingStartOffset, 0.0, 200.0);
 	ImGui::SliderInt("Chunksize", &endlessTerrain.pparams->chunkSize, 0, 10000);
-	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0f, 10000.0f);
-	ImGui::SliderFloat("Farplane", &farPlane, 0.0f, 10000.0f);
+	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0f, 2000000.0f);
+	ImGui::SliderFloat("Farplane", &farPlane, 0.0f, 2000000.0f);
 
 	ImGui::Text("Perlin Noise Array Size");
 	ImGui::RadioButton("64*64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	

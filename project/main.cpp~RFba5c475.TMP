@@ -664,7 +664,7 @@ void display(void)
 	glViewport(0, 0, water.m_refractionFbo.width, water.m_refractionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//Offset the clipping plane slightly above the water to avoid black artefact lines along intersections with shallow terrain
-	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y + 1.0f));
+	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y + 20.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera to pre-particle-buffer
