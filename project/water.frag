@@ -64,11 +64,11 @@ void main()
 	totalDistortion *= clamp(waterDepth/noTransparencyDepth, 0, 1);													//Reduce distortion on fragments with low depth
 
 	reflectionCoords+= totalDistortion;
-	reflectionCoords.x = clamp(reflectionCoords.x, 0.001, 0.999); //Don't let the distortion go outside the texture
-	reflectionCoords.y = clamp(reflectionCoords.y, -0.999, -0.001);
+	//reflectionCoords.x = clamp(reflectionCoords.x, 0.001, 0.999); //Don't let the distortion go outside the texture
+	//reflectionCoords.y = clamp(reflectionCoords.y, -0.999, -0.001);
 
 	refractionCoords+= totalDistortion;  
-	refractionCoords = clamp(refractionCoords, 0.001, 0.999);
+	//refractionCoords = clamp(refractionCoords, 0.001, 0.999);
 
 	vec4 reflectionColor = texture2D(reflectionTexture, reflectionCoords);
 	vec4 refractionColor = texture2D(refractionTexture, refractionCoords);
@@ -101,6 +101,7 @@ void main()
 	//Blend in a bit of bluish-green tint and add the specularHighlights
 	fragmentColor = mix(fragmentColor, vec4(0.0, 0.3, 0.5, 1.0), 0.3) + vec4(specularHighlights, 0.0f);
 
+	//Fade out water close to edges of things sticking out
 	fragmentColor.a = clamp(waterDepth/noTransparencyDepth, 0, 1);
 	//fragmentColor = vec4(waterDepth/50.0);
 }

@@ -1,7 +1,5 @@
 
 
-
-#include <iostream>
 #ifdef _WIN32
 extern "C" _declspec(dllexport) unsigned int NvOptimusEnablement = 0x00000001;
 #endif
@@ -19,11 +17,9 @@ extern "C" _declspec(dllexport) unsigned int NvOptimusEnablement = 0x00000001;
 using namespace glm;
 
 #include <Model.h>
-#include "Material.h"
-#include "ThirdPersonCamera.h"
 #include "hdr.h"
+#include "HeightGenerator.h"
 #include "terrain.h"
-#include "endlessTerrain.h"
 #include "ParticleSystem.h"
 #include "Water.h"
 
@@ -43,17 +39,16 @@ float previousTime = 0.0f;
 float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
+int octaves = 4;
+float scalingBias = 0.6f;
 
-static const int PERLIN_NOISE_ARRAY_SIZES[] =
-{
-	64 * 64,
-	100*100,
-	300*300,
-	500*500,
-	800*800,
-	1000*1000,
-	2000*2000
-};
+//int tesselation = 262144;
+int size = 400;
+int tesselation = ((size/6)*2)*((size/6)*2);
+//int tesselation = 2000;
+HeightGenerator heightGenerator(tesselation);
+Terrain terrain(tesselation, heightGenerator);
+
 
 //TODO: Remove this in favour of utilizing illumination map in the shaders
 //Global Light (the sun)
@@ -77,31 +72,17 @@ GLuint postProcessShaderProgram;
 ///////////////////////////////////////////////////////////////////////////////
 Water water;
 
-
-////////////////////////////////////////////////////////////////////////////////
-// Particle
-///////////////////////////////////////////////////////////////////////////////
 ParticleSystem smokeParticleSystem;
 ParticleSystem fogParticleSystem;
 FboInfo preParticleFB;
 
-float shipVelocity;
-
-////////////////////////////////////////////////////////////////////////////////
-// 3rd Person Camera
-///////////////////////////////////////////////////////////////////////////////
-bool thirdPersonCameraActive = true;
-float timeOfLastSwap = 0.0f;
-vec3 thirdPersonCameraOffset;
-ThirdPersonCamera thirdPersonCamera(0, 0, 30.0f, 1.5f);
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
 ///////////////////////////////////////////////////////////////////////////////
-float environment_multiplier = 1.5f;
+float environment_multiplier = 2.0f;
 GLuint environmentMap, irradianceMap, reflectionMap;
 const std::string envmap_base_name = "001";
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
@@ -111,14 +92,17 @@ vec3 point_light_color = vec3(1.f, 1.0f, 1.f);
 
 float point_light_intensity_multiplier = 100.0f;
 
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
 //vec3 cameraPosition(-270.0f, 300.0f, 70.0f);
-vec3 cameraPosition(1.0f, 10.0f, 1.0f);
+vec3 cameraPosition(0.0f, 50.0f, 70.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-
-float cameraSpeed = 3.0f;
+float cameraSpeed = 2.0f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -133,36 +117,6 @@ mat4 roomModelMatrix;
 mat4 landingPadModelMatrix; 
 mat4 fighterModelMatrix;
 mat4 terrainModelMatrix;
-
-///////////////////////////////////////////////////////////////////////////////
-// Terrain
-///////////////////////////////////////////////////////////////////////////////
-EndlessTerrain endlessTerrain;
-
-std::string grassTexture = "../res/grass.png";
-std::string rocksTexture1 = "../res/rocks_1.png";
-std::string rocksTexture2 = "../res/rocks_2.png";
-std::string rockyGroundTexture = "../res/rocky_ground.png";
-std::string sandyGroundTexture = "../res/sandy_grass.png";
-std::string snowTexture = "../res/snow.png";
-
-
-//Setup of materials
-int materialsCount = 6;
-Material sand			("sand",			vec3(194, 178, 128) / vec3(255), 0.0f,	vec3(194, 178, 128)	/ vec3(255), .605f, 0.027f, 1.0f);
-Material grassGreen		("grassGreen",		vec3(96, 153, 25)	/ vec3(255), 0.4f, vec3(96, 153, 25)	/ vec3(255), .432f, 0.128f, 1.0f);
-Material grassDarkGreen	("grassDarkGreen",	vec3(28, 104, 29)	/ vec3(255), 0.6f, vec3(28, 104, 29)	/ vec3(255), .058f, 0.318f, 1.0f);
-Material mountainLight	("mountainLight",	vec3(109, 107, 96)	/ vec3(255), 0.8f, vec3(109, 107, 96)	/ vec3(255), .0638f, 0.052f, 1.0f);
-Material mountainDark	("mountainDark",	vec3(66, 66, 59)	/ vec3(255), 0.88f, vec3(66, 66, 59)	/ vec3(255), .778f, 0.041f, 1.0f);
-Material mountainSnow	("mountainSnow",	vec3(255, 255, 255) / vec3(255), 0.94f, vec3(255, 255, 255) / vec3(255), .401f, 0.083f, 1.0f);
-
-vec3 * baseColours = new vec3[materialsCount];
-float * baseColourStrengths = new float[materialsCount];
-float * baseTextureScales = new float[materialsCount];
-float * baseHeights = new float[materialsCount];
-float * baseBlends = new float[materialsCount];
-vector<Material> materials = { sand, grassGreen, grassDarkGreen, mountainLight, mountainDark, mountainSnow };
-
 
 void loadShaders(bool is_reload)
 {
@@ -183,13 +137,13 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	//		Load Shaders
 	///////////////////////////////////////////////////////////////////////
-	heightShader				= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/heightfield.frag");
 	backgroundProgram			= labhelper::loadShaderProgram("../project/background.vert",  "../project/background.frag");
 	shaderProgram				= labhelper::loadShaderProgram("../project/shading.vert",     "../project/shading.frag");
+	simpleShaderProgram			= labhelper::loadShaderProgram("../project/simple.vert",      "../project/simple.frag");
+	heightShader				= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag");
 	waterShaderProgram			= labhelper::loadShaderProgram("../project/water.vert",		  "../project/water.frag");
 	particleShaderProgram		= labhelper::loadShaderProgram("../project/particle.vert", "../project/particle.frag");
 	postProcessShaderProgram	= labhelper::loadShaderProgram("../project/postProcessing.vert", "../project/postProcessing.frag");
-
 	///////////////////////////////////////////////////////////////////////
 	// Load models and set up model matrices
 	///////////////////////////////////////////////////////////////////////
@@ -197,35 +151,25 @@ void initGL()
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
 	sphereModel     = labhelper::loadModelFromOBJ("../scenes/sphere.obj");
 
-	float landingPadYPosition = 35.0f;
+	float landingPadYPosition = 5.0f;
 
 	roomModelMatrix = mat4(1.0f);
 
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
-	thirdPersonCameraOffset = vec3(45, 30, 0);
-
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
-	vec3 scaleFactor = vec3(1, 1, 1); //Use this to scale the map
-	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(0.0f, 0.0f, 0.0f));
-	//terrain.initTerrain(octaves, persistance, lacunarity, heightMultiplier);
+	vec3 scaleFactor = vec3(size*3, 100, size*3); //Use this to scale the map
+	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(-1.0f, 0.0f, -1.0f));
+	terrain.initTerrain(octaves, scalingBias);
 
-	const string texturePaths[] = {
-		"../res/sandy_grass.png",
-		"../res/grass.png",
-		"../res/rocky_ground.png",
-		"../res/rocks_1.png",
-		"../res/rocks_2.png",
-		"../res/snow.png" 
-	};
-	endlessTerrain.loadTextures(texturePaths, materialsCount);
+
 
 
 
 	///////////////////////////////////////////////////////////////////////
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
-	const float waterYPos = 30.0f;
-	const float waterSize = 20000.0f;
+	const float waterYPos = -30.0f;
+	const float waterSize = 500.0f;
 
 	//Reflection map resolution (higher is better and slower)
 	const float reflectionX = 1280;
@@ -241,12 +185,12 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	//		Setup Particle System
 	///////////////////////////////////////////////////////////////////////
-	int systemSize = 10000;
+	int systemSize = 100;
 
 	//Note: ship is facing in negative x-direction (issue with model)
-	const vec3 smokeOffset = vec3(19.0f, 1.3f, 0); //How much offset the smoke should have from the origin position of the ship
+	const vec3 smokeOffset = vec3(17.0f, 2.0f, 0); //How much offset the smoke should have from the origin position of the ship
 	vec3 startingPos = vec3(smokeOffset.x + fighterModelMatrix[3].x, smokeOffset.y + fighterModelMatrix[3].y, smokeOffset.z + fighterModelMatrix[3].z);
-	float spawnTime = 0.04f;
+	float spawnTime = 0.1f;
 
 	std::string textureAtlasPath = "../res/ParticleAtlas.png";
 	int atlasRows = 8;
@@ -254,16 +198,14 @@ void initGL()
 	/*const std::string textureAtlasPath = "../res/smoke_atlas.png";
 	const int atlasRows = 4;*/
 
-	//Initialize the particle system with given parameters
-	smokeParticleSystem = *(new ParticleSystem(systemSize, startingPos, smokeOffset, spawnTime, textureAtlasPath, atlasRows));
+	smokeParticleSystem = *(new ParticleSystem(systemSize, startingPos, spawnTime, textureAtlasPath, atlasRows));
 
 
-	/*systemSize = 2000;
+	systemSize = 2000;
 	startingPos = fighterModelMatrix[3];
 	spawnTime = 100.0f;
-	textureAtlasPath = "../res/fog_gradient.png";
-	atlasRows = 10;
-	fogParticleSystem = *(new ParticleSystem(systemSize, startingPos, smokeOffset, spawnTime, textureAtlasPath, atlasRows));*/
+	textureAtlasPath = "../res/fog_particleAtlas.png";
+	fogParticleSystem = *(new ParticleSystem(systemSize, startingPos, spawnTime, textureAtlasPath, atlasRows));
 
 
 
@@ -279,60 +221,38 @@ void initGL()
 	environmentMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + ".hdr");
 	irradianceMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + "_irradiance.hdr");
 
-
+	//Load terrain textures
+	std::string heightFieldFilePath = "../res/land_with_pond.png";
+	std::string heightFieldTexture = "../res/wildgrass.png";
+	std::string heightFieldNormals = "../res/NormalMap.png";
+	//terrain.loadHeightField(heightFieldFilePath);
+	terrain.loadDiffuseTexture(heightFieldTexture);
+	//terrain.loadNormalMap(heightFieldNormals);
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
 	glEnable(GL_CULL_FACE);		// enables backface culling
 	glEnable(GL_CLIP_DISTANCE0); //Enable clipping plane 0 for use in vertex shaders
-	
 
 
 }
 
-vec3 getFighterPosition()
+
+vec3 calculateSmokeVelocity(vec3 shipDirection, float speed)
 {
-	return vec3(fighterModelMatrix[3].x, fighterModelMatrix[3].y, fighterModelMatrix[3].z);
+
+	vec3 baseVelocity = -shipDirection * speed;
+
+	return baseVelocity;
 }
 
-//Gets camera position for either 3rd person or 1st person cam based on flag
-vec3 getActiveCameraPosition()
+vec3 calculateFogVelocity(vec3 nope, float speed)
 {
-	if (thirdPersonCameraActive)
-	{
-		return thirdPersonCamera.position;
-	}
-		
-		//return getFighterPosition() + thirdPersonCameraOffset;
-	return cameraPosition;
+
+	vec3 baseVelocity = vec3((rand() % 300) / 300.0f);
+
+	return baseVelocity;
 }
 
-//This is a bit odd, not sure it completely works
-vec3 getActiveLookAtTarget()
-{
-	if(thirdPersonCameraActive)
-	{
-		vec3 direction = vec3(fighterModelMatrix[3].x, fighterModelMatrix[3].y, fighterModelMatrix[3].z) - getActiveCameraPosition();
-		return getActiveCameraPosition() + direction;
-	}
-	//Not reflection
-	return cameraPosition + cameraDirection;
-}
-
-
-//Sent as a parameter to particle system
-//Used to calculate the speed of each particle, which allows for randomization within a particle system
-vec3 calculateSmokeVelocity(mat4 parentModelMatrix, float shipSpeed, float speed)
-{
-	vec3 shipDirection = vec3(-parentModelMatrix[0][0], parentModelMatrix[1][0], parentModelMatrix[2][0]);
-	vec3 baseVelocity = -shipDirection * (speed-shipSpeed);
-	baseVelocity = vec3(0);
-	vec3 scatteringY = vec3(parentModelMatrix[0][1], parentModelMatrix[1][1], parentModelMatrix[2][1]) * (((rand() % 1000) /100.0f) - 5.0f);
-	vec3 scatteringZ = vec3(-parentModelMatrix[0][2], parentModelMatrix[1][2], parentModelMatrix[2][2]) * (((rand() % 1000) / 100.0f) - 5.0f);
-	return baseVelocity + scatteringY + scatteringZ;
-}
-
-
-//Draw the debug light and its beautiful line
 void debugDrawLight(const glm::mat4 &viewMatrix, const glm::mat4 &projectionMatrix, const glm::vec3 &worldSpaceLightPos)
 {
 	mat4 modelMatrix = glm::translate(worldSpaceLightPos);
@@ -344,17 +264,15 @@ void debugDrawLight(const glm::mat4 &viewMatrix, const glm::mat4 &projectionMatr
 }
 
 
-//Draw the cubemap background
 void drawBackground(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	glUseProgram(backgroundProgram);
 	labhelper::setUniformSlow(backgroundProgram, "environment_multiplier", environment_multiplier);
 	labhelper::setUniformSlow(backgroundProgram, "inv_PV", inverse(projectionMatrix * viewMatrix));
-	labhelper::setUniformSlow(backgroundProgram, "camera_pos", getActiveCameraPosition());
+	labhelper::setUniformSlow(backgroundProgram, "camera_pos", cameraPosition);
 	labhelper::drawFullScreenQuad();
 }
 
-//Draw the basic scene models
 void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &projectionMatrix, const mat4 &lightViewMatrix, const mat4 &lightProjectionMatrix, const glm::vec4 clipPlane)
 {
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
@@ -375,7 +293,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	// camera
 	labhelper::setUniformSlow(currentShaderProgram, "viewInverse", inverse(viewMatrix));
 
-
 	 //landing pad 
 	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
 	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
@@ -395,7 +312,6 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	
 }
 
-//Setup the water shader params and render the water quad
 void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	water.m_moveFactor += WAVE_SPEED;
@@ -409,7 +325,7 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	//Setup data in shaders, for information on each field, refer to the shader
 	labhelper::setUniformSlow(waterShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * water.m_modelMatrix);
 	labhelper::setUniformSlow(waterShaderProgram, "moveFactor", water.m_moveFactor);
-	labhelper::setUniformSlow(waterShaderProgram, "cameraPosition", getActiveCameraPosition());
+	labhelper::setUniformSlow(waterShaderProgram, "cameraPosition", cameraPosition);
 	labhelper::setUniformSlow(waterShaderProgram, "modelMatrix", water.m_modelMatrix);
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightPosition", globalLightPosition);
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightColor", globalLightColor);
@@ -424,7 +340,6 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	glDisable(GL_BLEND);											//Disable blend again after rendering
 }
 
-//Draw the particle system using the preParticleFB depthbuffer to create "softness"
 void drawParticleSystem(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 {
 	glUseProgram(particleShaderProgram);
@@ -441,20 +356,16 @@ void drawParticleSystem(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, preParticleFB.depthBuffer);
 
-	//Smoketrail
 	smokeParticleSystem.render();
-
-	//FOG
-	//labhelper::setUniformSlow(particleShaderProgram, "atlasRows", fogParticleSystem.m_atlasRows);
-	//fogParticleSystem.render();
+	labhelper::setUniformSlow(particleShaderProgram, "atlasRows", fogParticleSystem.m_atlasRows);
+	fogParticleSystem.render();
 	glDisable(GL_BLEND);											//Disable blend again after rendering
 	glEnable(GL_DEPTH_TEST);
 }
 
-
-//draw a quad on top of the window (Only used for early debuggin, but keeping it here for now)
 void drawQuad(float width, float height)
 {
+
 	glUseProgram(simpleShaderProgram);
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_2D, (water.m_reflectionFbo.colorTextureTargets.at(0)));
@@ -479,51 +390,43 @@ void drawQuad(float width, float height)
 	glBindVertexArray(vertexArrayObject);
 	glDrawArrays(GL_TRIANGLES, 0, nofVertices);
 	if (previous_depth_state) glEnable(GL_DEPTH_TEST);
+
+	
 }
 
-//Sets up the terrain shader params, updates internal visibility and then draws the terrain
 void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm::vec4 clipPlane)
 {
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
 	
 	glUseProgram(heightShader);
-
 	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
 	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
 	
 	// Environment
-	labhelper::setUniformSlow(heightShader, "environmentMultiplier", environment_multiplier);
+	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 1);
 
 	// camera
 	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
-	mat4 normalMatrix = inverse(transpose(viewMatrix * terrainModelMatrix));
+	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "normalMatrix", normalMatrix);
+	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
 
 	//Clipping
 	labhelper::setUniformSlow(heightShader, "clippingPlane", clipPlane);
 	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
-
-	//Materials
-	for (int i = 0; i < materialsCount; i++) {
-		baseColours[i] = materials[i].tint;
-		baseHeights[i] = materials[i].baseHeight;
-		baseColourStrengths[i] = materials[i].tintStrength;
-		baseTextureScales[i] = materials[i].textureScale;
-		baseBlends[i] = materials[i].blendStrength;
-	}
-
-	labhelper::setUniformSlow(heightShader, "materialsCount", materialsCount);
-	labhelper::setUniformSlow(heightShader, "baseColours", materialsCount, baseColours);
-	labhelper::setUniformSlow(heightShader, "baseHeights", materialsCount, baseHeights);
-	labhelper::setUniformSlow(heightShader, "baseBlends", materialsCount, baseBlends);
-	labhelper::setUniformSlow(heightShader, "baseColourStrengths", materialsCount, baseColourStrengths);
-	labhelper::setUniformSlow(heightShader, "baseTextureScales", materialsCount, baseTextureScales);
-
-	endlessTerrain.updateVisibleChunks(cameraPosition);
+	
+	//material
+	labhelper::setUniformSlow(heightShader, "material_reflectivity", .1f);
+	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
+	labhelper::setUniformSlow(heightShader, "material_emission", .5f);
+	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
+	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
+	terrain.submitTriangles();
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -537,7 +440,6 @@ void drawSinglePassScene(GLuint currentShaderProgram, const mat4 &viewMatrix, co
 	debugDrawLight(viewMatrix, projectionMatrix, vec3(lightPosition));
 }
 
-//Draws everything in the preParticleFB to the screen in a fullscreen quad (Prevents having to re-rasterize and re-shade the scene)
 void drawPostProcessedQuad()
 {
 	glUseProgram(postProcessShaderProgram);
@@ -566,41 +468,34 @@ void display(void)
 	}
 
 	///////////////////////////////////////////////////////////////////////////
-	// Update particleSystems (This should happen in a logic main loop, but we have none
+	// Update particleSystem (This should happen in a logic main loop, but we have none
 	// so it goes here for now!)
 	///////////////////////////////////////////////////////////////////////////
-	float speed = 40;
-	//Smoketrail system position update
-	smokeParticleSystem.update(fighterModelMatrix);
 
-	if(shipVelocity < 0.001 && shipVelocity > -0.001f)
+	//Fighter model for some reason looks into the negative x-direction, so its forwards is -x rather than z
+	vec3 shipDirection = vec3(-fighterModelMatrix[0][0], fighterModelMatrix[1][0], fighterModelMatrix[1][2]);
+	float speed = 10;
+	smokeParticleSystem.process_particles(deltaTime, cameraPosition, &calculateSmokeVelocity, shipDirection, speed);
+	fogParticleSystem.process_particles(deltaTime, cameraPosition, &calculateFogVelocity, vec3(0), 0);
+	if(fogParticleSystem.m_max_size > fogParticleSystem.m_particles.size())
 	{
-		smokeParticleSystem.m_spawnTime = 0.0f;
-	}else
-	{
-		smokeParticleSystem.m_spawnTime = 0.025f / shipVelocity;
+		float fogSize = 100.0f;
+		float randomResolution = 10000;
+		vec3 spawnOffset = vec3(rand()%10000 / );
+		vec3 spawnPosition = fogParticleSystem.m_system_position + spawnOffset;
+		Particle newParticle{ 0, 30, 5, 0, calculateFogVelocity(vec3(0), 0), fogParticleSystem.m_system_position };
+		fogParticleSystem.spawn();
 	}
 	
-	//Update all particles in the system
-	smokeParticleSystem.process_particles(deltaTime, getActiveCameraPosition(), &calculateSmokeVelocity, fighterModelMatrix, shipVelocity, speed);
 
 
 	///////////////////////////////////////////////////////////////////////////
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
 
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 20000.0f);
+	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 4000.0f);
 
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
-
-
-	//Use 3rd person camera instead
-	if(thirdPersonCameraActive)
-	{
-		thirdPersonCamera.updateCamera(fighterModelMatrix);
-		//Look at the fighter!
-		viewMatrix = lookAt(getActiveCameraPosition(), vec3(fighterModelMatrix[3].x, fighterModelMatrix[3].y, fighterModelMatrix[3].z), worldUp);
-	}
 
 	vec4 lightStartPosition = vec4(40.0f, 60.0f, 0.0f, 1.0f);
 	lightPosition = vec3(rotate(currentTime, worldUp) * lightStartPosition);
@@ -627,19 +522,11 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//distance to move camera to move "below" water
-	float distanceToMove = 2 * (getActiveCameraPosition().y - water.m_modelMatrix[3].y);
-	vec3 reflectionCameraPosition = getActiveCameraPosition() - worldUp * distanceToMove;
+	float distanceToMove = 2 * (cameraPosition.y - water.m_modelMatrix[3].y);  
+	vec3 reflectionCameraPosition = cameraPosition - worldUp * distanceToMove;
 
 	//Look at the inversed y direction (inverse pitch)
 	mat4 reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + vec3(cameraDirection.x, -cameraDirection.y, cameraDirection.z), worldUp);
-	if (thirdPersonCameraActive)
-	{
-		vec3 reflectionDirection = normalize((getFighterPosition() - getActiveCameraPosition()));
-		reflectionDirection.y = -reflectionDirection.y;
-		reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + reflectionDirection, /* worldUp*/ vec3(-fighterModelMatrix[0].y, fighterModelMatrix[1].y, fighterModelMatrix[2].y));
-	}
-
-		
 	float renderPassOffset = 1.0f;
 	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -water.m_modelMatrix[3].y +1.0f));
 
@@ -663,9 +550,7 @@ void display(void)
 	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
 	drawWater(viewMatrix, projMatrix);
 
-	///////////////////////////////////////////////////////////////////////////
-	// Draw from camera to pre-particle-buffer
-	///////////////////////////////////////////////////////////////////////////
+	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, windowWidth, windowHeight);
 	glClearColor(0, 0, 0, 1.0);
@@ -673,9 +558,9 @@ void display(void)
 	
 	drawPostProcessedQuad();
 
+
 	drawParticleSystem(viewMatrix, projMatrix);
 	//drawQuad(0.5f, 0.5f);
-
 
 } 
 
@@ -691,11 +576,6 @@ bool handleEvents(void)
 		if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g) {
 			showUI = !showUI;
 		}
-		if (event.type == SDL_MOUSEWHEEL)
-		{
-			float zoomSpeed = 50.0f;
-			thirdPersonCamera.addDistance(float(-event.wheel.y)*deltaTime*zoomSpeed);
-		}
 		if (event.type == SDL_MOUSEMOTION && !ImGui::IsMouseHoveringAnyWindow()) {
 			static int prev_xcoord = event.motion.x;
 			static int prev_ycoord = event.motion.y;
@@ -704,18 +584,9 @@ bool handleEvents(void)
 
 			if (event.button.button & SDL_BUTTON(SDL_BUTTON_LEFT)) {
 				float rotationSpeed = 0.005f;
-				if (!thirdPersonCameraActive)
-				{
-					mat4 yaw = rotate(rotationSpeed * -delta_x, worldUp);
-					mat4 pitch = rotate(rotationSpeed * -delta_y, normalize(cross(cameraDirection, worldUp)));
-					cameraDirection = vec3(pitch * yaw * vec4(cameraDirection, 0.0f));
-				}else
-				{
-					thirdPersonCamera.addAngleAroundParent(rotationSpeed * -delta_x);
-					thirdPersonCamera.addPitch(rotationSpeed*-delta_y);
-
-				}
-				
+				mat4 yaw = rotate(rotationSpeed * -delta_x, worldUp);
+				mat4 pitch = rotate(rotationSpeed * -delta_y, normalize(cross(cameraDirection, worldUp)));
+				cameraDirection = vec3(pitch * yaw * vec4(cameraDirection, 0.0f));
 			}
 			prev_xcoord = event.motion.x;
 			prev_ycoord = event.motion.y;
@@ -726,113 +597,47 @@ bool handleEvents(void)
 	const uint8_t *state = SDL_GetKeyboardState(nullptr);
 	vec3 cameraRight = cross(cameraDirection, worldUp);
 
-	//Movment speed of ship
-	const float fighterSpeed = 100.0f;
+
 	if (state[SDL_SCANCODE_W]) {
-		if(thirdPersonCameraActive)
-		{
-			vec3 totalMovement = fighterSpeed * deltaTime * vec3(-1, 0, 0);
-			fighterModelMatrix = fighterModelMatrix* translate(totalMovement);
-			shipVelocity = fighterSpeed;
-		}else
-		{
-			cameraPosition += cameraSpeed * cameraDirection;
-		}
+		cameraPosition += cameraSpeed* cameraDirection;
 	}
-	else if (state[SDL_SCANCODE_S]) {
-		if (thirdPersonCameraActive)
-		{
-			vec3 totalMovement = fighterSpeed * deltaTime * vec3(1, 0, 0);
-			fighterModelMatrix = fighterModelMatrix * translate(totalMovement);
-			shipVelocity = fighterSpeed;
-		}
-		else
-		{
-			cameraPosition -= cameraSpeed * cameraDirection;
-		}
-	} else
-	{
-		shipVelocity = 0.0f;
-	}
-	if(state[SDL_SCANCODE_SPACE])
-	{
-		shipVelocity = 100.0f;
+	if (state[SDL_SCANCODE_S]) {
+		cameraPosition -= cameraSpeed * cameraDirection;
 	}
 	if (state[SDL_SCANCODE_A]) {
-		if (thirdPersonCameraActive)
-		{
-			float yawSpeed = 2.0f * deltaTime;
-			fighterModelMatrix = fighterModelMatrix * rotate(yawSpeed, vec3(0,1,0));
-		}
-		else
-		{
-			cameraPosition -= cameraSpeed * cameraRight;
-		}
-		
+		cameraPosition -= cameraSpeed * cameraRight;
 	}
 	if (state[SDL_SCANCODE_D]) {
-		if (thirdPersonCameraActive)
-		{
-			float yawSpeed = 2.0f * deltaTime;
-			fighterModelMatrix =  fighterModelMatrix * rotate(yawSpeed, vec3(0, -1, 0));
-		}
-		else
-		{
-			cameraPosition += cameraSpeed * cameraRight;
-		}
-		
+		cameraPosition += cameraSpeed * cameraRight;
 	}
 	if (state[SDL_SCANCODE_Q]) {
-		if (thirdPersonCameraActive)
-		{
-			vec3 totalMovement = fighterSpeed * deltaTime * vec3(0, -1, 0);
-			fighterModelMatrix = translate(totalMovement) * fighterModelMatrix;
-		}
-		else
-		{
-			cameraPosition -= cameraSpeed * worldUp;
-		}
-		
+		cameraPosition -= cameraSpeed * worldUp;
 	}
-
 	if (state[SDL_SCANCODE_E]) {
-		if (thirdPersonCameraActive)
-		{
-			vec3 totalMovement = fighterSpeed * deltaTime * vec3(0, 1, 0);
-			fighterModelMatrix = translate(totalMovement) * fighterModelMatrix;
-		}
-		else
-		{
-			cameraPosition += cameraSpeed * worldUp;
-		}
-		
+		cameraPosition += cameraSpeed * worldUp;
 	}
-	if (state[SDL_SCANCODE_F])
-	{
-		if(timeOfLastSwap + 1.0 < currentTime)
-		{
-			thirdPersonCameraActive = !thirdPersonCameraActive;
-			timeOfLastSwap = currentTime;
-		}
-			
+	if (state[SDL_SCANCODE_P]) {
+		terrain.initTerrain(octaves, scalingBias);
 	}
-	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_z)) {
-		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams, cameraPosition);
+	if (state[SDL_SCANCODE_Z]) {
+		if(octaves > 2) octaves -= 2;
+		printf("Octaves: %i \n", octaves);
+		terrain.updateTerrain(octaves, scalingBias);
 	}
-	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_x)) {
-		endlessTerrain.generator.generateSeedArray(endlessTerrain.pparams->seedArraySize);
-		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams, cameraPosition);
+	if (state[SDL_SCANCODE_X]) {
+		if (octaves < 20) octaves += 2;
+		printf("Octaves: %i \n", octaves);
+		terrain.updateTerrain(octaves, scalingBias);
 	}
 	if (state[SDL_SCANCODE_C]) {
-		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams, cameraPosition);
+		if (scalingBias > 0.2f) scalingBias -= 0.2f;
+		printf("bias: %f \n", scalingBias);
+		terrain.updateTerrain(octaves, scalingBias);
 	}
-	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_l)) {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		
-	}
-	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_o)) {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
+	if (state[SDL_SCANCODE_V]) {
+		if (scalingBias < 4.0f) scalingBias += 0.2f;
+		printf("bias: %f \n", scalingBias);
+		terrain.updateTerrain(octaves, scalingBias);
 	}
 	return quitEvent;
 }
@@ -843,65 +648,8 @@ void gui()
 	ImGui_ImplSdlGL3_NewFrame(g_window);
 
 	// ----------------- Set variables --------------------------
-	ImGui::Text("Endless Terrain, press Z to activate changes, press X to generate new terrain");
-	ImGui::SliderInt("Mesh Simplifciation Factor", &endlessTerrain.pparams->meshSimplificationFactor, 0, 3);
-	ImGui::SliderInt("Octaves", &endlessTerrain.pparams->octaves, 1, 12);
-	ImGui::SliderFloat("Persistance", &endlessTerrain.pparams->persistance, 0.1, 3.0);
-	ImGui::SliderFloat("Lacunarity", &endlessTerrain.pparams->lacunarity, 0.1, 5.0);
-	ImGui::SliderFloat("Height Multiplier", &endlessTerrain.pparams->heightMultiplier, 1.0, 2000.0);
-	ImGui::SliderFloat("Sample start offset", &endlessTerrain.pparams->perlinSamplingStartOffset, 0.0, 200.0);
-	ImGui::SliderInt("Chunksize", &endlessTerrain.pparams->chunkSize, 0, 2000);
-	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0, 20000.0);
-
-	ImGui::Text("Perlin Noise Array Size");
-	ImGui::RadioButton("64*64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	
-	ImGui::RadioButton("100*100", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[1]);
-	ImGui::RadioButton("300*300", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[2]);
-	ImGui::RadioButton("500*500", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[3]);
-	ImGui::RadioButton("800*800", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[4]);
-	ImGui::RadioButton("1000*1000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[5]);
-	ImGui::RadioButton("2000*2000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[6]);
-
-	ImGui::Text("Material 1");
-	ImGui::SliderFloat("Blend 1", &materials[0].blendStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Tint 1", &materials[0].tintStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Scale 1", &materials[0].textureScale, 0.01, 1.0);
-	ImGui::SliderFloat("Height 1", &materials[0].baseHeight, 0.0, 1.0);
-
-	ImGui::Text("Material 2");
-	ImGui::SliderFloat("Blend 2", &materials[1].blendStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Tint 2", &materials[1].tintStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Scale 2", &materials[1].textureScale, 0.01, 1.0);
-	ImGui::SliderFloat("Height 2", &materials[1].baseHeight, 0.0, 1.0);
-
-	ImGui::Text("Material 3");
-	ImGui::SliderFloat("Blend 3", &materials[2].blendStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Tint 3", &materials[2].tintStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Scale 3", &materials[2].textureScale, 0.01, 1.0);
-	ImGui::SliderFloat("Height 3", &materials[2].baseHeight, 0.0, 1.0);
-
-	ImGui::Text("Material 4");
-	ImGui::SliderFloat("Blend 4", &materials[3].blendStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Tint 4", &materials[3].tintStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Scale 4", &materials[3].textureScale, 0.01, 1.0);
-	ImGui::SliderFloat("Height 4", &materials[3].baseHeight, 0.0, 1.0);
-
-	ImGui::Text("Material 5");
-	ImGui::SliderFloat("Blend 5", &materials[4].blendStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Tint 5", &materials[4].tintStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Scale 5", &materials[4].textureScale, 0.01, 1.0);
-	ImGui::SliderFloat("Height 5", &materials[4].baseHeight, 0.0, 1.0);
-
-	ImGui::Text("Material 6");
-	ImGui::SliderFloat("Blend 6", &materials[5].blendStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Tint 6", &materials[5].tintStrength, 0.01, 1.0);
-	ImGui::SliderFloat("Scale 6", &materials[5].textureScale, 0.01, 1.0);
-	ImGui::SliderFloat("Height 6", &materials[5].baseHeight, 0.0, 1.0);
-
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-	ImGui::Text("Camera position = x: %f, y: %f, z: %f)", cameraPosition.x, cameraPosition.y, cameraPosition.z);
 	// ----------------------------------------------------------
-
 	// Render the GUI.
 	ImGui::Render();
 }
