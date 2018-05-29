@@ -205,6 +205,8 @@ void main()
 	//watch noise array
 	
 	//fragmentColor = vec4(vec3(positionOut), 1.0f);
+	//fragmentColor = vec4(vec3(normalize(positionOut*0.5 + vec3(0.5)).y), 1.0f);
+
 	return;
 
 }
