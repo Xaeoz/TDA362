@@ -32,6 +32,7 @@ EndlessTerrain::EndlessTerrain()
 }
 void EndlessTerrain::updateVisibleChunks(vec3 viewerPosition)
 {
+	chunksVisibleInViewDst = (int)pparams->maxViewDistance / pparams->chunkSize;
 	//Test all chunks from the last frame if they are still visible
 	for (auto &const x : terrainChunkDictionary)
 	{
@@ -122,14 +123,23 @@ int EndlessTerrain::calculateLod(vec2 terrainPosition, vec3 viewerPosition)
 	vec2 terrainWorldCoord = vec2(terrainPosition*vec2(pparams->chunkSize));
 
 	int dist = distance(terrainWorldCoord, vec2(viewerPosition.x, viewerPosition.z));
-	if (dist < pparams->chunkSize*3) {
+	if (dist < pparams->chunkSize*5) {
 		return 0;
 	}
-	else if (dist >= pparams->chunkSize*3 && dist < pparams->chunkSize * 5) {
+	else if (dist >= pparams->chunkSize*5 && dist < pparams->chunkSize * 10) {
 		return 1;
 	}
-	else {
+	else if (dist >= pparams->chunkSize * 10 && dist < pparams->chunkSize * 15) {
 		return 2;
+	}
+	else if (dist >= pparams->chunkSize * 15 && dist < pparams->chunkSize * 20) {
+		return 3;
+	}
+	else if (dist >= pparams->chunkSize * 20 && dist < pparams->chunkSize * 25) {
+		return 4;
+	}
+	else {
+		return 5;
 	}
 
 }

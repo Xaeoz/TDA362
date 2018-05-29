@@ -51,6 +51,8 @@ static const int PERLIN_NOISE_ARRAY_SIZES[] =
 	2000*2000
 };
 
+float farPlane = 30000.f;
+
 //TODO: Remove this in favour of utilizing illumination map in the shaders
 //Global Light (the sun)
 vec3 globalLightPosition = vec3(0, 100, -1000);				//Position of the imaginary "sun"
@@ -74,7 +76,7 @@ Water water;
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
 ///////////////////////////////////////////////////////////////////////////////
-float environment_multiplier = 1.5f;
+float environment_multiplier = 1.75f;
 GLuint environmentMap, irradianceMap, reflectionMap;
 const std::string envmap_base_name = "001";
 
@@ -92,7 +94,7 @@ float point_light_intensity_multiplier = 100.0f;
 //vec3 cameraPosition(-270.0f, 300.0f, 70.0f);
 vec3 cameraPosition(1.0f, 10.0f, 1.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-float cameraSpeed = 3.0f;
+float cameraSpeed = 30.0f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -193,7 +195,7 @@ void initGL()
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
 	const float waterYPos = 30.0f;
-	const float waterSize = 20000.0f;
+	const float waterSize = 200000.0f;
 
 	//Reflection map resolution (higher is better and slower)
 	const float reflectionX = 1280;
@@ -415,7 +417,7 @@ void display(void)
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
 
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 20000.0f);
+	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, float(farPlane));
 
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
@@ -536,6 +538,7 @@ bool handleEvents(void)
 	}
 	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_x)) {
 		endlessTerrain.generator.generateSeedArray(endlessTerrain.pparams->seedArraySize);
+		endlessTerrain.terrainChunkDictionary.clear();
 		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams, cameraPosition);
 	}
 	if (state[SDL_SCANCODE_C]) {
@@ -559,14 +562,14 @@ void gui()
 
 	// ----------------- Set variables --------------------------
 	ImGui::Text("Endless Terrain, press Z to activate changes, press X to generate new terrain");
-	ImGui::SliderInt("Mesh Simplifciation Factor", &endlessTerrain.pparams->meshSimplificationFactor, 0, 3);
 	ImGui::SliderInt("Octaves", &endlessTerrain.pparams->octaves, 1, 12);
-	ImGui::SliderFloat("Persistance", &endlessTerrain.pparams->persistance, 0.1, 3.0);
+	ImGui::SliderFloat("Persistance", &endlessTerrain.pparams->persistance, 0.01, 3.0);
 	ImGui::SliderFloat("Lacunarity", &endlessTerrain.pparams->lacunarity, 0.1, 5.0);
-	ImGui::SliderFloat("Height Multiplier", &endlessTerrain.pparams->heightMultiplier, 1.0, 2000.0);
+	ImGui::SliderFloat("Height Multiplier", &endlessTerrain.pparams->heightMultiplier, 1.0, 10000.0);
 	ImGui::SliderFloat("Sample start offset", &endlessTerrain.pparams->perlinSamplingStartOffset, 0.0, 200.0);
-	ImGui::SliderInt("Chunksize", &endlessTerrain.pparams->chunkSize, 0, 2000);
-	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0, 20000.0);
+	ImGui::SliderInt("Chunksize", &endlessTerrain.pparams->chunkSize, 0, 10000);
+	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0f, 2000000.0f);
+	ImGui::SliderFloat("Farplane", &farPlane, 0.0f, 2000000.0f);
 
 	ImGui::Text("Perlin Noise Array Size");
 	ImGui::RadioButton("64*64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	

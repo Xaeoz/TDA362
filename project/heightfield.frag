@@ -2,7 +2,7 @@
 
 // required by GLSL spec Sect 4.5.3 (though nvidia does not, amd does)
 precision highp float;
-
+#define PI 3.14159265359
 uniform vec3 material_color;
 
 in  vec2 texCoord;
@@ -23,13 +23,16 @@ uniform float baseBlends[materialsCount];
 uniform float baseColourStrengths[materialsCount];
 uniform float baseTextureScales[materialsCount];
 uniform float environmentMultiplier;
+uniform mat4 viewInverse;
+
 float minHeight = 0.0f;
 float maxHeight = 1.0f;
 float epsilon = 0.000001f;
 vec3 scaledWorldPos = position/0.3;
 
-
 layout(binding = 26) uniform sampler2DArray textureArray;
+layout(binding = 7) uniform sampler2D irradianceMap;
+layout(binding = 8) uniform sampler2D reflectionMap;
 layout(location = 0) out vec4 fragmentColour;
 
 float inverseLerp(float a, float b, float val) {
@@ -39,8 +42,41 @@ float inverseLerp(float a, float b, float val) {
 //Calculate some basic ambient lighting
 vec3 calculateIllumiunation(vec3 wo, vec3 n, vec3 colorIn)
 {
-	float cosTheta = clamp(dot(n, wo), 0, 1);
-	return colorIn * cosTheta *environmentMultiplier;
+	//float cosTheta = clamp(dot(n, wo), 0, 1);
+	//return colorIn * cosTheta * environmentMultiplier;
+
+	vec4 nws = viewInverse * vec4(n.x, n.y, n.z, 0);
+
+	// Calculate the spherical coordinates of the direction
+	float theta = acos(max(-1.0f, min(1.0f, nws.y)));
+	float phi = atan(nws.z, nws.x);
+	if (phi < 0.0f) phi = phi + 2.0f * PI;
+
+	//Lookup the color in the environment map
+	vec2 lookup = vec2(phi / (2.0 * PI), theta / PI);
+	vec4 irradiance = environmentMultiplier * texture(irradianceMap, lookup);
+	vec3 diffuse_term = colorIn * (1.0 / PI) * irradiance.xyz;
+	vec3 wi = reflect(wo, n);
+
+	float material_shininess = 0.9f;
+	float material_fresnel = 0.9f;
+	float material_metalness = 0.9f;
+	float material_reflectivity = 0.9f;
+
+	float s = 0.1f; //material_shininess
+	float roughness = sqrt(sqrt(2 / (s + 2)));
+	vec3 Li = environmentMultiplier * textureLod(reflectionMap, lookup, roughness * 7.0).xyz;
+	vec3 wh = normalize(wi + wo);
+	float F = material_fresnel + (1 - material_fresnel) * pow((1 - dot(wh, wi)), 5);
+	vec3 dielectric_term = F*Li + (1 - F)*diffuse_term;
+	vec3 metal_term = F * colorIn * Li;
+	//return diffuse_term;
+	float m = material_metalness;
+	float r = material_reflectivity;
+	vec3 microfacet_term = m * metal_term + (1 - m) * dielectric_term;
+
+	vec3 result = r * microfacet_term + (1 - r) * diffuse_term;
+	return result;
 }
 
 //Blend together textures projected from all axes based on the vertex normal.
