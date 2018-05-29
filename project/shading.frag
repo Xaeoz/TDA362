@@ -162,7 +162,12 @@ void main()
 	vec3 wo = -normalize(viewSpacePosition);
 	vec3 n = normalize(viewSpaceNormal);
 
-	vec3 myColor = material_color;
+	vec4 materialColor;
+
+
+
+	vec3 myColor = materialColor.xyz;
+
 	if (has_diffuse_texture == 1) {
 		myColor = texture2D(diffuseMap, texCoord).xyz;
 	}
@@ -190,45 +195,12 @@ void main()
 	
 	//Actual shading
 	
-	//fragmentColor = vec4(shading, 1.0f);
+	fragmentColor = vec4(shading, 1.0f);
 
-	//Deep Water
-	if((positionOut).y < 0.16) {
-		fragmentColor = vec4((vec3(6, 80, 170)/vec3(255)), 1.0f);
-	}
-
-	//Shallow Water
-	if((positionOut).y > 0.15) {
-		fragmentColor = vec4((vec3(6, 162, 170)/vec3(255)), 1.0f);
-	}
-
-	//Sand
-	if((positionOut).y > 0.31) {
-		fragmentColor = vec4((vec3(232, 215, 111)/vec3(255)), 1.0f);
-	}
-
-	//Green grass
-	if((positionOut).y > 0.45) {
-		fragmentColor = vec4((vec3(6, 170, 9)/vec3(255)), 1.0f);
-	}
-
-	//Dark grass
-	if((positionOut).y > 0.6) {
-		fragmentColor = vec4((vec3(28, 104, 29)/vec3(255)), 1.0f);
-	}
-
-	//Mountain
-	if((positionOut).y > 0.75) {
-		fragmentColor = vec4((vec3(186, 184, 178)/vec3(255)), 1.0f);
-	}
-
-	//Snow
-	if((positionOut).y > 0.9) {
-		fragmentColor = vec4(1.0, 1.0, 1.0, 1.0f);
-	}
+	//fragmentColor = vec4(normal.xyz, 1.0f);
 	
 	//Watch Perlin noise
-	//fragmentColor = vec4(vec3(normalize(positionOut*0.5 + vec3(0.5)).y), 1.0f);
+	//fragmentColor = vec4(vec3(positionOut.y), 1.0f);
 	//fragmentColor = vec4(positionOut.x, 1.0, positionOut.z, 1.0);
 	//watch noise array
 	

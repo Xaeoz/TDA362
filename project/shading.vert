@@ -30,7 +30,6 @@ void main()
 	gl_Position = modelViewProjectionMatrix * vec4(position, 1.0f);
 	texCoord = texCoordIn; 
 	viewSpaceNormal = (normalMatrix * vec4(normalIn, 0.0)).xyz;
-
 	viewSpacePosition = (modelViewMatrix * vec4(position, 1.0f)).xyz;
 	gl_ClipDistance[0] = dot(modelMatrix*vec4(position, 1), clippingPlane);
 

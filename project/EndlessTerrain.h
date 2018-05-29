@@ -12,32 +12,46 @@ using namespace std;
 
 class EndlessTerrain {
 public:
-	float maxViewDist;
-	int chunkSize;
-	int chunksVisibleInViewDst;
-	map<pair<int, int>, Terrain> terrainChunkDictionary;
-	int tesselation;
-	int meshSimplificationFactor;
-	vector<Terrain> terrainChunksVisibleLastUpdate;
-	float * perlinNoise;
-	HeightGenerator generator;
-	int perlinNoiseSize;
 
 	struct TerrainParams {
-		int octaves = 4;
-		float lacunarity = 2.4;
-		float persistance = 0.8;
-		float heightMultiplier = 300;
-		int perlinNoiseSize = 40000; //Must have integer root (e.g. 1, 2, 64, 900, etc..)
-		int seedArraySize = 40000;
+		int octaves = 5;
+		float lacunarity = 4.6f;
+		float persistance = 0.2f;
+		float heightMultiplier = 1000.f;
+		int perlinNoiseSize = 250* 250;
+		int seedArraySize = 1000*1000;
+		int meshSimplificationFactor = 0;
+		float perlinSamplingStartOffset = 1.f;
+		int nSquares = 40*40;
+		int tesselation = nSquares * 2;
+		int chunkSize = 2000;
+		float maxViewDistance = chunkSize*4;
 	};
 
 	TerrainParams params;
 	TerrainParams *pparams = &params;
 
-	EndlessTerrain(int chunkSize, float maxViewDist, int tesselation);
+
+	int chunksVisibleInViewDst;
+	int tesselation;
+	int meshSimplificationFactor;
+	int perlinNoiseSize;
+	float * perlinNoise;
+	map<pair<int, int>, Terrain> terrainChunkDictionary;
+	HeightGenerator generator;
+	GLuint textureArray;
+
+
+
+	EndlessTerrain();
+
+	bool checkIfChunkExists(vec2 viewedChunkCoord);
 
 	void updateVisibleChunks(vec3 viewerPosition);
+
+	void createNewTerrainChunk(vec2 viewedChunkCoord, vec3 viewerPosition);
+
+	void updateTerrainChunk(Terrain & terrain, TerrainParams * tp, vec3 viewerPosition);
 
 	void drawChunks();
 
@@ -45,11 +59,10 @@ public:
 
 	float calculateDistance(Terrain & terrain, vec3 viewerPosition);
 
+	int calculateLod(vec2 terrainPosition, vec3 viewerPosition);
 
-	void setVisibility(Terrain& terrain, bool visible);
+	void updateTerrainChunks(TerrainParams * tp, vec3 viewerPosition);
 
-	void updateTerrainChunks(TerrainParams * tp);
-
-	void updateTerrainParams(TerrainParams * tp, int octaves, float persistance, float lacunarity, float heightMultiplier, int perlinNoiseSize);
+	void loadTextures(const std::string * texturePaths, int nTextures);
 
 };

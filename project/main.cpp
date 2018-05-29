@@ -1,6 +1,7 @@
 
 
 #include "Water.h"
+#include "Material.h"
 #ifdef _WIN32
 extern "C" _declspec(dllexport) unsigned int NvOptimusEnablement = 0x00000001;
 #endif
@@ -39,19 +40,15 @@ float deltaTime    = 0.0f;
 bool showUI = false;
 int windowWidth, windowHeight;
 
-int chunkSize = 1000;
-float maxViewDistance = 4000;
-float heightMultiplier = 300;
-int tesselation = 1800;
-
 static const int PERLIN_NOISE_ARRAY_SIZES[] =
 {
-	64,
-	600,
-	900,
-	1600,
-	3600,
-	4000
+	64 * 64,
+	100*100,
+	300*300,
+	500*500,
+	800*800,
+	1000*1000,
+	2000*2000
 };
 
 //TODO: Remove this in favour of utilizing illumination map in the shaders
@@ -74,14 +71,12 @@ GLuint waterShader;
 ///////////////////////////////////////////////////////////////////////////////
 Water water;
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
 ///////////////////////////////////////////////////////////////////////////////
-float environment_multiplier = 2.0f;
+float environment_multiplier = 1.5f;
 GLuint environmentMap, irradianceMap, reflectionMap;
 const std::string envmap_base_name = "001";
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // Light source
@@ -91,17 +86,13 @@ vec3 point_light_color = vec3(1.f, 1.0f, 1.f);
 
 float point_light_intensity_multiplier = 100.0f;
 
-
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
 //vec3 cameraPosition(-270.0f, 300.0f, 70.0f);
-vec3 cameraPosition(1.0f, 100.0f, 100.0f);
+vec3 cameraPosition(1.0f, 10.0f, 1.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-float cameraSpeed = 1.0f;
+float cameraSpeed = 3.0f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -117,8 +108,34 @@ mat4 landingPadModelMatrix;
 mat4 fighterModelMatrix;
 mat4 terrainModelMatrix;
 
-EndlessTerrain endlessTerrain(chunkSize, maxViewDistance, tesselation);
+///////////////////////////////////////////////////////////////////////////////
+// Terrain
+///////////////////////////////////////////////////////////////////////////////
+EndlessTerrain endlessTerrain;
 
+std::string grassTexture = "../res/grass.png";
+std::string rocksTexture1 = "../res/rocks_1.png";
+std::string rocksTexture2 = "../res/rocks_2.png";
+std::string rockyGroundTexture = "../res/rocky_ground.png";
+std::string sandyGroundTexture = "../res/sandy_grass.png";
+std::string snowTexture = "../res/snow.png";
+
+
+//Setup of materials
+int materialsCount = 6;
+Material sand			("sand",			vec3(194, 178, 128) / vec3(255), 0.0f,	vec3(194, 178, 128)	/ vec3(255), .605f, 0.027f, 1.0f);
+Material grassGreen		("grassGreen",		vec3(96, 153, 25)	/ vec3(255), 0.4f, vec3(96, 153, 25)	/ vec3(255), .432f, 0.128f, 1.0f);
+Material grassDarkGreen	("grassDarkGreen",	vec3(28, 104, 29)	/ vec3(255), 0.6f, vec3(28, 104, 29)	/ vec3(255), .058f, 0.318f, 1.0f);
+Material mountainLight	("mountainLight",	vec3(109, 107, 96)	/ vec3(255), 0.8f, vec3(109, 107, 96)	/ vec3(255), .0638f, 0.052f, 1.0f);
+Material mountainDark	("mountainDark",	vec3(66, 66, 59)	/ vec3(255), 0.88f, vec3(66, 66, 59)	/ vec3(255), .778f, 0.041f, 1.0f);
+Material mountainSnow	("mountainSnow",	vec3(255, 255, 255) / vec3(255), 0.94f, vec3(255, 255, 255) / vec3(255), .401f, 0.083f, 1.0f);
+
+vec3 * baseColours = new vec3[materialsCount];
+float * baseColourStrengths = new float[materialsCount];
+float * baseTextureScales = new float[materialsCount];
+float * baseHeights = new float[materialsCount];
+float * baseBlends = new float[materialsCount];
+vector<Material> materials = { sand, grassGreen, grassDarkGreen, mountainLight, mountainDark, mountainSnow };
 
 
 void loadShaders(bool is_reload)
@@ -140,7 +157,7 @@ void initGL()
 	///////////////////////////////////////////////////////////////////////
 	backgroundProgram   = labhelper::loadShaderProgram("../project/background.vert",  "../project/background.frag");
 	shaderProgram       = labhelper::loadShaderProgram("../project/shading.vert",     "../project/shading.frag");
-	heightShader		= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/shading.frag");
+	heightShader		= labhelper::loadShaderProgram("../project/heightfield.vert", "../project/heightfield.frag");
 	waterShader			= labhelper::loadShaderProgram("../project/water.vert",		  "../project/water.frag");
 
 	///////////////////////////////////////////////////////////////////////
@@ -150,23 +167,33 @@ void initGL()
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
 	sphereModel     = labhelper::loadModelFromOBJ("../scenes/sphere.obj");
 
-	float landingPadYPosition = 5.0f;
+	float landingPadYPosition = 35.0f;
 
 	roomModelMatrix = mat4(1.0f);
 
 	fighterModelMatrix = translate((landingPadYPosition + 15) * worldUp);
 	landingPadModelMatrix = translate(landingPadYPosition * worldUp);
-	vec3 scaleFactor = vec3(chunkSize *1, 1, chunkSize *1); //Use this to scale the map
+	vec3 scaleFactor = vec3(1, 1, 1); //Use this to scale the map
 	terrainModelMatrix = glm::scale((vec3(1.0f, 1.0f, 1.0f)*scaleFactor))*translate(vec3(0.0f, 0.0f, 0.0f));
 	//terrain.initTerrain(octaves, persistance, lacunarity, heightMultiplier);
+
+	const string texturePaths[] = {
+		"../res/sandy_grass.png",
+		"../res/grass.png",
+		"../res/rocky_ground.png",
+		"../res/rocks_1.png",
+		"../res/rocks_2.png",
+		"../res/snow.png" 
+	};
+	endlessTerrain.loadTextures(texturePaths, materialsCount);
 
 
 
 	///////////////////////////////////////////////////////////////////////
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
-	const float waterYPos = -30.0f;
-	const float waterSize = 500.0f;
+	const float waterYPos = 30.0f;
+	const float waterSize = 20000.0f;
 
 	//Reflection map resolution (higher is better and slower)
 	const float reflectionX = 1280;
@@ -190,13 +217,7 @@ void initGL()
 	environmentMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + ".hdr");
 	irradianceMap = labhelper::loadHdrTexture("../scenes/envmaps/" + envmap_base_name + "_irradiance.hdr");
 
-	//Load terrain textures
-	std::string heightFieldFilePath = "../res/land_with_pond.png";
-	std::string heightFieldTexture = "../res/wildgrass.png";
-	std::string heightFieldNormals = "../res/NormalMap.png";
-	//terrain.loadHeightField(heightFieldFilePath);
-	//terrain.loadDiffuseTexture(heightFieldTexture);
-	//terrain.loadNormalMap(heightFieldNormals);
+
 
 	glEnable(GL_DEPTH_TEST);	// enable Z-buffering 
 	glEnable(GL_CULL_FACE);		// enables backface culling
@@ -246,21 +267,21 @@ void drawScene(GLuint currentShaderProgram, const mat4 &viewMatrix, const mat4 &
 	// camera
 	labhelper::setUniformSlow(currentShaderProgram, "viewInverse", inverse(viewMatrix));
 
-	//// landing pad 
-	//labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
+	// landing pad 
+	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", landingPadModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * landingPadModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * landingPadModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * landingPadModelMatrix)));
 
-	//labhelper::render(landingpadModel);
+	labhelper::render(landingpadModel);
 
-	//// Fighter
-	//labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
-	//labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
+	// Fighter
+	labhelper::setUniformSlow(currentShaderProgram, "modelMatrix", fighterModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * fighterModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "modelViewMatrix", viewMatrix * fighterModelMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix", inverse(transpose(viewMatrix * fighterModelMatrix)));
 
-	//labhelper::render(fighterModel);
+	labhelper::render(fighterModel);
 	
 	
 }
@@ -295,7 +316,6 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 
 void drawQuad(float width, float height)
 {
-
 	glUseProgram(simpleShaderProgram);
 	glActiveTexture(GL_TEXTURE10);
 	glBindTexture(GL_TEXTURE_2D, (water.m_reflectionFbo.colorTextureTargets.at(0)));
@@ -320,8 +340,6 @@ void drawQuad(float width, float height)
 	glBindVertexArray(vertexArrayObject);
 	glDrawArrays(GL_TRIANGLES, 0, nofVertices);
 	if (previous_depth_state) glEnable(GL_DEPTH_TEST);
-
-	
 }
 
 void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm::vec4 clipPlane)
@@ -329,34 +347,41 @@ void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm
 	vec4 viewSpaceLightPosition = viewMatrix * vec4(lightPosition, 1.0f);
 	
 	glUseProgram(heightShader);
+
 	labhelper::setUniformSlow(heightShader, "point_light_color", point_light_color);
 	labhelper::setUniformSlow(heightShader, "point_light_intensity_multiplier", point_light_intensity_multiplier);
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightPosition", vec3(viewSpaceLightPosition));
 	labhelper::setUniformSlow(heightShader, "viewSpaceLightDir", normalize(vec3(viewMatrix * vec4(-lightPosition, 0.0f))));
 	
 	// Environment
-	labhelper::setUniformSlow(heightShader, "environment_multiplier", environment_multiplier * 1);
+	labhelper::setUniformSlow(heightShader, "environmentMultiplier", environment_multiplier);
 
 	// camera
 	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
-	mat4 a = inverse(transpose(viewMatrix * terrainModelMatrix));
+	mat4 normalMatrix = inverse(transpose(viewMatrix * terrainModelMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
-	labhelper::setUniformSlow(heightShader, "normalMatrix", a);
+	labhelper::setUniformSlow(heightShader, "normalMatrix", normalMatrix);
 
 	//Clipping
 	labhelper::setUniformSlow(heightShader, "clippingPlane", clipPlane);
 	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
-	
-	//material
-	labhelper::setUniformSlow(heightShader, "material_reflectivity", .1f);
-	labhelper::setUniformSlow(heightShader, "material_metalness", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_fresnel", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_shininess", 1.0f);
-	labhelper::setUniformSlow(heightShader, "material_emission", .5f);
-	labhelper::setUniformSlow(heightShader, "has_diffuse_texture", 1);
-	labhelper::setUniformSlow(heightShader, "has_emission_texture", 0);
-	//terrain.submitTriangles();
+
+	//Materials
+	for (int i = 0; i < materialsCount; i++) {
+		baseColours[i] = materials[i].tint;
+		baseHeights[i] = materials[i].baseHeight;
+		baseColourStrengths[i] = materials[i].tintStrength;
+		baseTextureScales[i] = materials[i].textureScale;
+		baseBlends[i] = materials[i].blendStrength;
+	}
+
+	labhelper::setUniformSlow(heightShader, "materialsCount", materialsCount);
+	labhelper::setUniformSlow(heightShader, "baseColours", materialsCount, baseColours);
+	labhelper::setUniformSlow(heightShader, "baseHeights", materialsCount, baseHeights);
+	labhelper::setUniformSlow(heightShader, "baseBlends", materialsCount, baseBlends);
+	labhelper::setUniformSlow(heightShader, "baseColourStrengths", materialsCount, baseColourStrengths);
+	labhelper::setUniformSlow(heightShader, "baseTextureScales", materialsCount, baseTextureScales);
 
 	endlessTerrain.updateVisibleChunks(cameraPosition);
 }
@@ -390,7 +415,7 @@ void display(void)
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
 
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 4000.0f);
+	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 1.0f, 20000.0f);
 
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
@@ -488,7 +513,7 @@ bool handleEvents(void)
 
 
 	if (state[SDL_SCANCODE_W]) {
-		cameraPosition += cameraSpeed* cameraDirection;
+		cameraPosition += cameraSpeed * cameraDirection;
 	}
 	if (state[SDL_SCANCODE_S]) {
 		cameraPosition -= cameraSpeed * cameraDirection;
@@ -507,15 +532,18 @@ bool handleEvents(void)
 	}
 
 	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_z)) {
-		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams);
+		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams, cameraPosition);
 	}
 	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_x)) {
 		endlessTerrain.generator.generateSeedArray(endlessTerrain.pparams->seedArraySize);
-		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams);
+		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams, cameraPosition);
+	}
+	if (state[SDL_SCANCODE_C]) {
+		endlessTerrain.updateTerrainChunks(endlessTerrain.pparams, cameraPosition);
 	}
 	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_l)) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
+		
 	}
 	if ((event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_o)) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -531,20 +559,62 @@ void gui()
 
 	// ----------------- Set variables --------------------------
 	ImGui::Text("Endless Terrain, press Z to activate changes, press X to generate new terrain");
-	//ImGui::RadioButton("None", &currentEffect, PostProcessingEffect::None);
-	//ImGui::SameLine();
-	ImGui::SliderInt("Octaves", &endlessTerrain.pparams->octaves, 1, 8);
-	ImGui::SliderFloat("Persistance", &endlessTerrain.pparams->persistance, 0.1, 2.0);
-	ImGui::SliderFloat("Lacunarity", &endlessTerrain.pparams->lacunarity, 0.1, 3.0);
-	ImGui::SliderFloat("Height Multiplier", &endlessTerrain.pparams->heightMultiplier, 1.0, 1000.0);
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::SliderInt("Mesh Simplifciation Factor", &endlessTerrain.pparams->meshSimplificationFactor, 0, 3);
+	ImGui::SliderInt("Octaves", &endlessTerrain.pparams->octaves, 1, 12);
+	ImGui::SliderFloat("Persistance", &endlessTerrain.pparams->persistance, 0.1, 3.0);
+	ImGui::SliderFloat("Lacunarity", &endlessTerrain.pparams->lacunarity, 0.1, 5.0);
+	ImGui::SliderFloat("Height Multiplier", &endlessTerrain.pparams->heightMultiplier, 1.0, 2000.0);
+	ImGui::SliderFloat("Sample start offset", &endlessTerrain.pparams->perlinSamplingStartOffset, 0.0, 200.0);
+	ImGui::SliderInt("Chunksize", &endlessTerrain.pparams->chunkSize, 0, 2000);
+	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0, 20000.0);
+
 	ImGui::Text("Perlin Noise Array Size");
-	ImGui::RadioButton("64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	
-	ImGui::RadioButton("600", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[1]);
-	ImGui::RadioButton("900", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[2]);
-	ImGui::RadioButton("1600", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[3]);
-	ImGui::RadioButton("3600", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[4]);
-	ImGui::RadioButton("4000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[5]);
+	ImGui::RadioButton("64*64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	
+	ImGui::RadioButton("100*100", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[1]);
+	ImGui::RadioButton("300*300", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[2]);
+	ImGui::RadioButton("500*500", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[3]);
+	ImGui::RadioButton("800*800", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[4]);
+	ImGui::RadioButton("1000*1000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[5]);
+	ImGui::RadioButton("2000*2000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[6]);
+
+	ImGui::Text("Material 1");
+	ImGui::SliderFloat("Blend 1", &materials[0].blendStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Tint 1", &materials[0].tintStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Scale 1", &materials[0].textureScale, 0.01, 1.0);
+	ImGui::SliderFloat("Height 1", &materials[0].baseHeight, 0.0, 1.0);
+
+	ImGui::Text("Material 2");
+	ImGui::SliderFloat("Blend 2", &materials[1].blendStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Tint 2", &materials[1].tintStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Scale 2", &materials[1].textureScale, 0.01, 1.0);
+	ImGui::SliderFloat("Height 2", &materials[1].baseHeight, 0.0, 1.0);
+
+	ImGui::Text("Material 3");
+	ImGui::SliderFloat("Blend 3", &materials[2].blendStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Tint 3", &materials[2].tintStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Scale 3", &materials[2].textureScale, 0.01, 1.0);
+	ImGui::SliderFloat("Height 3", &materials[2].baseHeight, 0.0, 1.0);
+
+	ImGui::Text("Material 4");
+	ImGui::SliderFloat("Blend 4", &materials[3].blendStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Tint 4", &materials[3].tintStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Scale 4", &materials[3].textureScale, 0.01, 1.0);
+	ImGui::SliderFloat("Height 4", &materials[3].baseHeight, 0.0, 1.0);
+
+	ImGui::Text("Material 5");
+	ImGui::SliderFloat("Blend 5", &materials[4].blendStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Tint 5", &materials[4].tintStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Scale 5", &materials[4].textureScale, 0.01, 1.0);
+	ImGui::SliderFloat("Height 5", &materials[4].baseHeight, 0.0, 1.0);
+
+	ImGui::Text("Material 6");
+	ImGui::SliderFloat("Blend 6", &materials[5].blendStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Tint 6", &materials[5].tintStrength, 0.01, 1.0);
+	ImGui::SliderFloat("Scale 6", &materials[5].textureScale, 0.01, 1.0);
+	ImGui::SliderFloat("Height 6", &materials[5].baseHeight, 0.0, 1.0);
+
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::Text("Camera position = x: %f, y: %f, z: %f)", cameraPosition.x, cameraPosition.y, cameraPosition.z);
 	// ----------------------------------------------------------
 
 	// Render the GUI.

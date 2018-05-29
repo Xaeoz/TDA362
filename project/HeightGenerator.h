@@ -5,7 +5,6 @@
 
 class HeightGenerator {
 public:
-	const float AMPLITUDE;
 	int seed;
 	std::mt19937_64 rng;
 	std::uniform_int_distribution<std::default_random_engine::result_type> dist;
@@ -13,29 +12,26 @@ public:
 	int tesselation;
 	float start;
 
+	enum NormalizeMode
+	{
+		Local,
+		Global
+	};
 
 
-	HeightGenerator(int tesselation);
-
-	void setTesselation(int tesselationIn);
+	HeightGenerator();
 
 	float generateRandomFloat(float min, float max);
 
-	float generateHeight(float x, float z, float vertexDistance);
-
 	float generateNoise(int x, int z);
-
-	float getSmoothedNoise(int x, int z, float sl);
-
-	float getInterpolatedNoise(float x, float z, float sl);
-
-	float interpolate(float a, float b, float blend);
 
 	void generateSeedArray(int size);
 
-	void generatePerlinNoise(int size, int nOctaves, float * outputArray, float persistance, float lacunarity, float start);
+	float * generateFalloffMap(int size);
 
-	void generatePerlinNoise2(int size, int nOctaves, float * outputArray, float scalingBias, float start);
+	void generatePerlinNoise(int outputArraySize, int seedArraySize, int nOctaves, float * outputArray, float persistance, float lacunarity, float start, NormalizeMode mode);
+
+
 
 
 
