@@ -21,6 +21,12 @@ add_executable ( project
     terrain.cpp
     HeightGenerator.cpp
     ThirdPersonCamera.cpp
+	HeightGenerator.cpp
+	Terrain.cpp
+	EndlessTerrain.cpp
+	Material.cpp
+
+
     ${SHADERS}
     )
 
