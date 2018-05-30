@@ -17,7 +17,7 @@ uniform vec3 cameraPosition;
 uniform vec3 globalLightPosition;
 
 //Tiling of the texCoords
-const float tiling = 8.0;
+const float tiling = 100.0;
 
 
 void main()
