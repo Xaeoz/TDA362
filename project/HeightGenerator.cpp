@@ -63,8 +63,8 @@ float cosineInterpolation(float a, float b, float blend)
 
 float evaluate(float value)
 {
-	float a = 3;
-	float b = 2.2f;
+	float a = 2;
+	float b = 3.7f;
 	
 	return pow(value, a) / (pow(value, a) + pow(b - b*value, a));
 }
