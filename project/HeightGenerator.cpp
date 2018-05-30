@@ -160,11 +160,11 @@ void HeightGenerator::generatePerlinNoise(int outputArraySize, int seedArraySize
 			for (int y = 0; y < rowLength; y++) {
 				if (normalizeMode == Local) {
 					float toNormalize = outputArray[x * (rowLength)+y];
-					outputArray[x * rowLength + y] = clamp((toNormalize - minNoise) / (noiseDifference) - falloffMap[x * rowLength + y], 0.01f, FLT_MAX) ;
+					outputArray[x * rowLength + y] = clamp((toNormalize - minNoise) / (noiseDifference) - falloffMap[x * rowLength + y], 0.001f, FLT_MAX) ;
 				}
 				else {
 					float normalizedHeight = (outputArray[x * (rowLength) + y] + 1) / (2.f * maxPossibleHeight / 1.5f);
-					outputArray[x * (rowLength)+y] = clamp(normalizedHeight - falloffMap[x * rowLength + y], 0.0001f, FLT_MAX) ;
+					outputArray[x * (rowLength)+y] = clamp(normalizedHeight - falloffMap[x * rowLength + y], 0.1f, FLT_MAX);
 				}
 			}
 		}

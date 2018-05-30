@@ -41,7 +41,15 @@ void EndlessTerrain::updateVisibleChunks(vec3 viewerPosition)
 	}
 
 	int currentChunkCoordX = (int)(viewerPosition.x / pparams->chunkSize);
+	if (viewerPosition.x < 0)
+	{
+		currentChunkCoordX -= 1;
+	}
 	int currentChunkCoordY = (int)(viewerPosition.z / pparams->chunkSize);
+	if (viewerPosition.z < 0)
+	{
+		currentChunkCoordY -= 1;
+	}
 	vec2 currentChunkCoord(currentChunkCoordX, currentChunkCoordY);
 		
 	for (int yOffset = -chunksVisibleInViewDst; yOffset <= chunksVisibleInViewDst; yOffset++)
@@ -94,20 +102,19 @@ void EndlessTerrain::updateTerrainChunk(Terrain& terrain, TerrainParams *tp, vec
 Terrain EndlessTerrain::getCurrentChunk(vec3 viewPosition)
 {
 	int currentChunkCoordX = (int)(viewPosition.x / pparams->chunkSize);
+	if (viewPosition.x < 0)
+	{
+		currentChunkCoordX -= 1;
+	}
 	int currentChunkCoordY = (int)(viewPosition.z / pparams->chunkSize);
+	if (viewPosition.z < 0)
+	{
+		currentChunkCoordY -= 1;
+	}
 	pair<int, int> viewPositionPair(currentChunkCoordX, currentChunkCoordY);
 	map<pair<int, int>, Terrain>::iterator it = terrainChunkDictionary.find(viewPositionPair);
 	Terrain currentChunk = it->second;
 	return currentChunk;
-	//if (it != terrainChunkDictionary.end()) {
-	//	Terrain currentChunk = it->second;
-	//	return currentChunk;
-	//}
-	//else {
-	//	createNewTerrainChunk(vec2(currentChunkCoordX, currentChunkCoordY), viewPosition);
-	//	map<pair<int, int>, Terrain>::iterator it = terrainChunkDictionary.find(viewPositionPair);
-	//	return it->second;
-	//}
 }
 
 //Used to update terrain from GUI

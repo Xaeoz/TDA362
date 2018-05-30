@@ -24,8 +24,9 @@ bool CollisionDetection::willCollide(Terrain terrainChunk, vec3 nextPos, float s
 	for (int i = 0; i < (terrainChunk.verticesPerRow*terrainChunk.verticesPerRow); i++)
 	{
 		vec3 vertex(terrainChunk.verts[i * 3], terrainChunk.verts[i * 3 + 1], terrainChunk.verts[i * 3 + 2]);
-		float dist = distance(abs(nextPos), abs(vertex));
-		if (dist*dist < this->radius*this->radius)
+		float dist = distance(nextPos,vertex);
+		if (mindist > dist) mindist = dist; //Debugging
+		if (dist < this->radius)
 			return true;
 	}
 	return false;
@@ -68,12 +69,9 @@ bool isIntersectingTriangle(vec3 A, vec3 B, vec3 C, vec3 P, float r)
 	B = B - P;
 	C = C - P;
 
-	vec3 N = normalize(cross(C - A, B - A));
-	float d1 = dot(A, N);
-	float d2 = dot(B, N);
-	float d3 = dot(C, N);
+	vec3 N = normalize(cross(B - A,C - A));
 
-	float d = std::max(std::max(d1*d1, d2*d2), d3*d3);
+	float d = dot(A, N);
 	bool sep = (d*d > r*r);
 	return !sep;
 }

@@ -152,8 +152,8 @@ std::string snowTexture = "../res/snow.png";
 //Setup of materials
 int materialsCount = 6;
 Material sand			("sand",			vec3(194, 178, 128) / vec3(255), 0.0f,	vec3(194, 178, 128)	/ vec3(255), .605f, 0.027f, 1.0f);
-Material grassGreen		("grassGreen",		vec3(96, 153, 25)	/ vec3(255), 0.4f, vec3(96, 153, 25)	/ vec3(255), .432f, 0.128f, 1.0f);
-Material grassDarkGreen	("grassDarkGreen",	vec3(28, 104, 29)	/ vec3(255), 0.6f, vec3(28, 104, 29)	/ vec3(255), .058f, 0.318f, 1.0f);
+Material grassGreen		("grassGreen",		vec3(96, 153, 25)	/ vec3(255), 0.6f, vec3(96, 153, 25)	/ vec3(255), .432f, 0.128f, 1.0f);
+Material grassDarkGreen	("grassDarkGreen",	vec3(28, 104, 29)	/ vec3(255), 0.7f, vec3(28, 104, 29)	/ vec3(255), .058f, 0.318f, 1.0f);
 Material mountainLight	("mountainLight",	vec3(109, 107, 96)	/ vec3(255), 0.8f, vec3(109, 107, 96)	/ vec3(255), .0638f, 0.052f, 1.0f);
 Material mountainDark	("mountainDark",	vec3(66, 66, 59)	/ vec3(255), 0.88f, vec3(66, 66, 59)	/ vec3(255), .778f, 0.041f, 1.0f);
 Material mountainSnow	("mountainSnow",	vec3(255, 255, 255) / vec3(255), 0.94f, vec3(255, 255, 255) / vec3(255), .401f, 0.083f, 1.0f);
@@ -164,10 +164,13 @@ float * baseTextureScales = new float[materialsCount];
 float * baseHeights = new float[materialsCount];
 float * baseBlends = new float[materialsCount];
 vector<Material> materials = { sand, grassGreen, grassDarkGreen, mountainLight, mountainDark, mountainSnow };
+enum MeshMode { MESHMODE_ON, MESHMODE_OFF };
+int meshMode = MESHMODE_ON;
 
 //Collision Detection
 //Set radius of sphere to something slightly bigger than the distance between two vertices
 CollisionDetection collider(endlessTerrain.pparams->chunkSize / sqrt(endlessTerrain.pparams->nSquares) + 2);
+CollisionDetection collider2(cameraSpeed+5);
 
 void loadShaders(bool is_reload)
 {
@@ -672,25 +675,36 @@ void display(void)
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera to pre-particle-buffer
 	///////////////////////////////////////////////////////////////////////////
-	glBindFramebuffer(GL_FRAMEBUFFER, preParticleFB.framebufferId);
-	glViewport(0, 0, windowWidth, windowHeight);
-	glClearColor(0,0,0,1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	if (meshMode == MESHMODE_ON) {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, windowWidth, windowHeight);
+		glClearColor(0, 0, 0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
-	drawWater(viewMatrix, projMatrix);
+		drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
+		drawWater(viewMatrix, projMatrix);
+	}
+	else {
+		glBindFramebuffer(GL_FRAMEBUFFER, preParticleFB.framebufferId);
+		glViewport(0, 0, windowWidth, windowHeight);
+		glClearColor(0,0,0,1.0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	///////////////////////////////////////////////////////////////////////////
-	// Draw from camera to pre-particle-buffer
-	///////////////////////////////////////////////////////////////////////////
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, windowWidth, windowHeight);
-	glClearColor(0, 0, 0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0));
+		drawWater(viewMatrix, projMatrix);
+
+		///////////////////////////////////////////////////////////////////////////
+		// Draw from camera to pre-particle-buffer
+		///////////////////////////////////////////////////////////////////////////
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, windowWidth, windowHeight);
+		glClearColor(0, 0, 0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
-	drawPostProcessedQuad();
+		drawPostProcessedQuad();
 
-	drawParticleSystem(viewMatrix, projMatrix);
+		drawParticleSystem(viewMatrix, projMatrix);
+	}
 	//drawQuad(0.5f, 0.5f);
 
 
@@ -743,12 +757,6 @@ bool handleEvents(void)
 	const uint8_t *state = SDL_GetKeyboardState(nullptr);
 	vec3 cameraRight = cross(cameraDirection, worldUp);
 	Terrain currentChunk = endlessTerrain.getCurrentChunk(cameraPosition);
-	/*if (endlessTerrain.checkIfChunkExists(endlessTerrain.getCurrentChunk(cameraPosition).originCoord))
-	{
-		Terrain currentChunk = endlessTerrain.getCurrentChunk(cameraPosition);
-		willCollide = collider.isInteresecting(currentChunk, cameraPosition, cameraSpeed);
-	}*/
-
 
 
 	vec3 previousCameraPosition = cameraPosition;
@@ -862,10 +870,15 @@ bool handleEvents(void)
 
 	}
 
-	if (collider.willCollide(currentChunk, cameraPosition , cameraSpeed))
+	if (collider.willCollide(currentChunk, cameraPosition, cameraSpeed))
 	{
 		cameraPosition = previousCameraPosition;
 	}
+
+	//if (collider2.willCollideTriangle(currentChunk, cameraPosition, cameraSpeed))
+	//{
+	//	cameraPosition = previousCameraPosition;
+	//}
 
 	return quitEvent;
 }
@@ -873,6 +886,8 @@ bool handleEvents(void)
 void gui()
 {
 	// Inform imgui of new frame
+
+
 	ImGui_ImplSdlGL3_NewFrame(g_window);
 
 	// ----------------- Set variables --------------------------
@@ -885,6 +900,9 @@ void gui()
 	ImGui::SliderInt("Chunksize", &endlessTerrain.pparams->chunkSize, 0, 10000);
 	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0f, 10000.0f);
 	ImGui::SliderFloat("Farplane", &farPlane, 0.0f, 10000.0f);
+	ImGui::Text("MESHMODE");
+	ImGui::RadioButton("Mesh: On", &meshMode, MESHMODE_ON);
+	ImGui::RadioButton("Mesh: Off", &meshMode, MESHMODE_OFF);
 
 	ImGui::Text("Perlin Noise Array Size");
 	ImGui::RadioButton("64*64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	

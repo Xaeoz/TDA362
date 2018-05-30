@@ -14,10 +14,7 @@ using std::vector;
 
 float sqr5(float x)
 {
-	//return pow((0.6*x + 1), 2) - 1.5f;
-	return 2 * x - 1;
-	return x*x;
-
+	return x*x*x;
 }
 
 Terrain::Terrain(vec2 originCoord, int tesselation, int meshSimplificationFactor, int chunkSize)
@@ -103,7 +100,7 @@ float* Terrain::generateVertices(float * heightMap, float heightMultiplier)
 			verts[idx++] = x*chunkSize;
 			float heightCurveVal = heightCurve[(int)(heightMap[idx] * 10)]; //for debugging
 			float heightVal = heightMap[idx];
-			verts[idx++] = heightMap[idx] * heightMultiplier * heightCurve[(int)(heightMap[idx] * 1000)];
+			verts[idx++] = heightMap[idx] * heightMultiplier * sqr5(heightMap[idx]);//heightCurve[(int)(heightMap[idx] * 1000)];
 			verts[idx++] = z*chunkSize;
 			x += vertexDistance;
 		}
