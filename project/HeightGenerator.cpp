@@ -87,9 +87,11 @@ float * HeightGenerator::generateFalloffMap(int size)
 	return falloffMap;
 }
 
-void HeightGenerator::generatePerlinNoise(int outputArraySize, int seedArraySize, int nOctaves, float* outputArray, float persistance, float lacunarity, float start, NormalizeMode normalizeMode)
+void HeightGenerator::generatePerlinNoise(int outputArraySize, int seedArraySize, int nOctaves, float * outputArray, float persistance, float lacunarity, float start, NormalizeMode normalizeMode)
 {
 	fill_n(outputArray, outputArraySize, 0); //clear array of old values in-case it is a reassignment
+	delete[] outputArray;
+	outputArray = new float[outputArraySize];
 	int rowLength = sqrt(outputArraySize);
 	int scale = 1;
 	int * octaveOffsets = new int[nOctaves * 2];
@@ -167,7 +169,7 @@ void HeightGenerator::generatePerlinNoise(int outputArraySize, int seedArraySize
 			}
 		}
 
-
+		delete[] falloffMap;
 		std::cout << "Generated perlin noise map \n";
 }
 

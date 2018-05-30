@@ -2,6 +2,7 @@
 
 
 #include <iostream>
+#include "CollisionDetection.h"
 #ifdef _WIN32
 extern "C" _declspec(dllexport) unsigned int NvOptimusEnablement = 0x00000001;
 #endif
@@ -117,9 +118,9 @@ float point_light_intensity_multiplier = 100.0f;
 // Camera parameters.
 ///////////////////////////////////////////////////////////////////////////////
 //vec3 cameraPosition(-270.0f, 300.0f, 70.0f);
-vec3 cameraPosition(1.0f, 10.0f, 1.0f);
+vec3 cameraPosition(1.0f, 100.0f, 1.0f);
 vec3 cameraDirection = normalize(vec3(0.0f) - cameraPosition);
-float cameraSpeed = 30.0f;
+float cameraSpeed = 3.0f;
 
 vec3 worldUp(0.0f, 1.0f, 0.0f);
 
@@ -139,7 +140,6 @@ mat4 terrainModelMatrix;
 // Terrain
 ///////////////////////////////////////////////////////////////////////////////
 EndlessTerrain endlessTerrain;
-
 std::string grassTexture = "../res/grass.png";
 std::string rocksTexture1 = "../res/rocks_1.png";
 std::string rocksTexture2 = "../res/rocks_2.png";
@@ -164,6 +164,9 @@ float * baseHeights = new float[materialsCount];
 float * baseBlends = new float[materialsCount];
 vector<Material> materials = { sand, grassGreen, grassDarkGreen, mountainLight, mountainDark, mountainSnow };
 
+//Collision Detection
+//Set radius of sphere to something slightly bigger than the distance between two vertices
+CollisionDetection collider(endlessTerrain.pparams->chunkSize / sqrt(endlessTerrain.pparams->nSquares) + 2);
 
 void loadShaders(bool is_reload)
 {
@@ -726,7 +729,16 @@ bool handleEvents(void)
 	// check keyboard state (which keys are still pressed)
 	const uint8_t *state = SDL_GetKeyboardState(nullptr);
 	vec3 cameraRight = cross(cameraDirection, worldUp);
+	Terrain currentChunk = endlessTerrain.getCurrentChunk(cameraPosition);
+	/*if (endlessTerrain.checkIfChunkExists(endlessTerrain.getCurrentChunk(cameraPosition).originCoord))
+	{
+		Terrain currentChunk = endlessTerrain.getCurrentChunk(cameraPosition);
+		willCollide = collider.isInteresecting(currentChunk, cameraPosition, cameraSpeed);
+	}*/
 
+
+
+	vec3 previousCameraPosition = cameraPosition;
 	//Movment speed of ship
 	const float fighterSpeed = 100.0f;
 	if (state[SDL_SCANCODE_W]) {
@@ -735,7 +747,7 @@ bool handleEvents(void)
 			vec3 totalMovement = fighterSpeed * deltaTime * vec3(-1, 0, 0);
 			fighterModelMatrix = fighterModelMatrix* translate(totalMovement);
 			shipVelocity = fighterSpeed;
-		}else
+		} else
 		{
 			cameraPosition += cameraSpeed * cameraDirection;
 		}
@@ -836,6 +848,12 @@ bool handleEvents(void)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	}
+
+	if (collider.willCollide(currentChunk, cameraPosition , cameraSpeed))
+	{
+		cameraPosition = previousCameraPosition;
+	}
+
 	return quitEvent;
 }
 

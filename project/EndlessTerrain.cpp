@@ -1,6 +1,6 @@
 #include "EndlessTerrain.h"
 #include "HeightGenerator.h";
-
+#include "CollisionDetection.h";
 #include <iostream>
 #include <stdint.h>
 #include <vector>
@@ -9,6 +9,7 @@
 #include <labhelper.h>
 #include <random>
 #include <math.h>
+
 
 
 using namespace glm;
@@ -41,7 +42,8 @@ void EndlessTerrain::updateVisibleChunks(vec3 viewerPosition)
 
 	int currentChunkCoordX = (int)(viewerPosition.x / pparams->chunkSize);
 	int currentChunkCoordY = (int)(viewerPosition.z / pparams->chunkSize);
-	
+	vec2 currentChunkCoord(currentChunkCoordX, currentChunkCoordY);
+		
 	for (int yOffset = -chunksVisibleInViewDst; yOffset <= chunksVisibleInViewDst; yOffset++)
 		for (int xOffset = -chunksVisibleInViewDst; xOffset <= chunksVisibleInViewDst; xOffset++) {
 
@@ -89,9 +91,29 @@ void EndlessTerrain::updateTerrainChunk(Terrain& terrain, TerrainParams *tp, vec
 	}
 }
 
+Terrain EndlessTerrain::getCurrentChunk(vec3 viewPosition)
+{
+	int currentChunkCoordX = (int)(viewPosition.x / pparams->chunkSize);
+	int currentChunkCoordY = (int)(viewPosition.z / pparams->chunkSize);
+	pair<int, int> viewPositionPair(currentChunkCoordX, currentChunkCoordY);
+	map<pair<int, int>, Terrain>::iterator it = terrainChunkDictionary.find(viewPositionPair);
+	Terrain currentChunk = it->second;
+	return currentChunk;
+	//if (it != terrainChunkDictionary.end()) {
+	//	Terrain currentChunk = it->second;
+	//	return currentChunk;
+	//}
+	//else {
+	//	createNewTerrainChunk(vec2(currentChunkCoordX, currentChunkCoordY), viewPosition);
+	//	map<pair<int, int>, Terrain>::iterator it = terrainChunkDictionary.find(viewPositionPair);
+	//	return it->second;
+	//}
+}
+
 //Used to update terrain from GUI
 void EndlessTerrain::updateTerrainChunks(TerrainParams *tp, vec3 viewerPosition)
 {
+	delete[] perlinNoise;
 	perlinNoise = new float[pparams->perlinNoiseSize];
 	tp->tesselation = tp->nSquares * 2;
 	generator.generatePerlinNoise(

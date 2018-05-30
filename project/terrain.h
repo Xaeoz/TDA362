@@ -17,7 +17,8 @@ public:
 	int * meshSimplificationFactors;
 	int chunkSize;
 	float * heightCurve;
-	float * heightMap; 
+	float * heightMap;
+	float * verts;
 	bool visible;
 	vec2 originCoord;
 	HeightGenerator generator;

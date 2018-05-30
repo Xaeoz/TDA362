@@ -65,4 +65,6 @@ public:
 
 	void loadTextures(const std::string * texturePaths, int nTextures);
 
+	Terrain getCurrentChunk(vec3 viewPosition);
+
 };

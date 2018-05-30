@@ -25,7 +25,7 @@ add_executable ( project
 	Terrain.cpp
 	EndlessTerrain.cpp
 	Material.cpp
-
+    CollisionDetection.cpp
 
     ${SHADERS}
     )

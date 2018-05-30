@@ -8,12 +8,16 @@
 #include <labhelper.h>
 
 using namespace glm;
+using namespace std;
 using std::string;
 using std::vector;
 
 float sqr5(float x)
 {
+	//return pow((0.6*x + 1), 2) - 1.5f;
+	return 2 * x - 1;
 	return x*x;
+
 }
 
 Terrain::Terrain(vec2 originCoord, int tesselation, int meshSimplificationFactor, int chunkSize)
@@ -34,6 +38,7 @@ Terrain::Terrain(vec2 originCoord, int tesselation, int meshSimplificationFactor
 	, visible(false)
 	, chunkSize(chunkSize)
 	, heightMap()
+	, verts()
 
 {
 	triangleRestartIndex = UINT32_MAX;
@@ -58,6 +63,7 @@ float* Terrain::generateHeightMap(float * perlinNoise, int perlinNoiseSize)
 	float vertexDistance = 1.0f / float(verticesPerRow - 1);
 	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
 	int rowLength = sqrt(perlinNoiseSize);
+	delete[] heightMap;
 	heightMap = new float[nrOfVertices];
 	int yOffset = ((int)originCoord.y * rowLength * (rowLength-(baseVerticesPerRow-1))) % perlinNoiseSize + perlinNoiseSize;
 	int xOffset = ((int)originCoord.x * (baseVerticesPerRow-1)) % rowLength + rowLength;
@@ -84,7 +90,8 @@ float* Terrain::generateHeightMap(float * perlinNoise, int perlinNoiseSize)
 float* Terrain::generateVertices(float * heightMap, float heightMultiplier)
 {
 	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
-	float* verts = new float[nrOfVertices];
+	//delete[] verts;
+	verts = new float[nrOfVertices];
 	float vertexDistance = 1.0f / float(verticesPerRow - 1);
 
 	int idx = 0;
@@ -193,7 +200,7 @@ float * Terrain::calculateVertexNormals(int * indices, float * surfaceNormals)
 			int test = indices[j];
 			if (indices[j] == triangleRestartIndex) restartIndexesPassed++;
 			if (indices[j] == i) {
-				for (int k = max(0, j - 2); k <= j; k++) {
+				for (int k = glm::max(0, j - 2); k <= j; k++) {
 					if(!(indices[k] == triangleRestartIndex || indices[k+1] == triangleRestartIndex || indices[k+2] == triangleRestartIndex) && k < m_numIndices - 2)
 						normalSum += vec3(surfaceNormals[(k - restartIndexesPassed*3)*3], surfaceNormals[(k - restartIndexesPassed*3)*3 + 1], surfaceNormals[(k - restartIndexesPassed*3)*3 + 2]);
 				}
@@ -211,7 +218,7 @@ void Terrain::initTerrain(float heightMultiplier, float * perlinNoise, int perli
 
 	int * indices = generateIndices();
 	heightMap = generateHeightMap(perlinNoise, perlinNoiseSize);
-	float * verts = generateVertices(heightMap, heightMultiplier);
+	verts = generateVertices(heightMap, heightMultiplier);
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
 	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
@@ -252,7 +259,7 @@ void Terrain::initTerrain(float heightMultiplier, float * perlinNoise, int perli
 void Terrain::updateTerrain(float heightMultiplier, float * perlinNoise, int perlinNoiseSize, int meshSimplificationFactor, bool updateLod)
 {
 	heightMap = generateHeightMap(perlinNoise, perlinNoiseSize);
-	float * verts = generateVertices(heightMap, heightMultiplier);
+	verts = generateVertices(heightMap, heightMultiplier);
 	int * indices = generateIndices();
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
