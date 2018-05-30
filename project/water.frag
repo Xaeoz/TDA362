@@ -24,8 +24,8 @@ uniform float farPlane;
 uniform float nearPlane;
 
 
-const float waveStrength = 0.0005;				//Strength of the distortions to the textures
-const float fresnelWeight = 2.0f;				//Controls reflection and refraction blending ( >1 means more reflective, <1 means more refractive)
+const float waveStrength = 0.004;				//Strength of the distortions to the textures
+const float fresnelWeight = 0.5f;				//Controls reflection and refraction blending ( >1 means more reflective, <1 means more refractive)
 const float shineDamper = 25.0;					//Exponent to damp the specular shine
 const float noTransparencyDepth = 10.0f;	//The depth at which the water should be rendered fully rather than alpha blending
 
@@ -51,11 +51,6 @@ void main()
 	float waterSurfaceDepth = 2.0*nearPlane*farPlane/ (farPlane + nearPlane - (2.0 * surfaceDepth - 1.0) * (farPlane-nearPlane));			//Calculation found online, do not alter unless necessary
 	//Finally calculate the actual depth
 	float waterDepth = waterFloorDepth - waterSurfaceDepth;
-	waterDepth -=1.0f;
-	if(waterDepth < 0)
-		waterDepth = 0;
-
-
 
 	
 	//Sample dudv map with moveFactor applied to the texCoords and weight it
@@ -64,7 +59,7 @@ void main()
 	distortedTexCoords = texCoords + vec2(distortedTexCoords.x, distortedTexCoords.y+moveFactor);
 	//Use the distortedTexCoords to once again sample the dudv map for the final distortion and weight by waveStrength
 	vec2 totalDistortion = (texture2D(dudvMap, distortedTexCoords).rg * 2.0 - 1.0) * waveStrength;
-	totalDistortion *= clamp(waterDepth/noTransparencyDepth, 0, 1);													//Reduce distortion on fragments with low depth
+	totalDistortion *= clamp(waterDepth/(noTransparencyDepth*10), 0, 1);													//Reduce distortion on fragments with low depth
 
 	reflectionCoords+= totalDistortion;
 	reflectionCoords.x = clamp(reflectionCoords.x, 0.001, 0.999); //Don't let the distortion go outside the texture
@@ -85,8 +80,9 @@ void main()
 	
 	//Fresnel effect
 	vec3 viewVector = normalize(toCameraVector);												//Normalize vector to camera to get direction
-	float refractiveFactor = dot(viewVector, normal);											//Factor for fresnel effect mixing (based on viewing direction in comparison to the fragment normal)
+	float refractiveFactor = dot(viewVector, vec3(0,1,0) /*normal*/);											//Factor for fresnel effect mixing (based on viewing direction in comparison to the fragment normal)
 	refractiveFactor = pow(refractiveFactor, fresnelWeight);									//Scale the factor ( >1 means more reflective, <1 more refractive)
+	refractiveFactor = refractiveFactor * clamp(1 - waterDepth/100 + 0.2, 0, 1);						//Reduce refractionFactor on deeper water
 	refractiveFactor = clamp(refractiveFactor, 0.001, 0.999);										//Make sure the factor is in the correct range (Could lead to black artifacts otherwise)
 
 
@@ -96,16 +92,16 @@ void main()
 	float specular = max(dot(reflectedLight, viewVector), 0.0);													//Calculate the specularity by comparing the direction of the reflectedLight and the view vector
 	specular = pow(specular, shineDamper);																		//Damp the shine from "good reflections"
 	vec3 specularHighlights = globalLightColor * specular * specularReflectivity;								//Calculate final specular highlight
-	specularHighlights *= clamp(waterDepth/noTransparencyDepth, 0, 1);											//Reduce specularity on fragments close to shores (with low depths)
+	specularHighlights *= clamp((waterDepth)/(5*noTransparencyDepth), 0, 1);				//Reduce specularity on fragments close to shores (with low depths)
 
 	//Mix reflection and refraction based on the refractiveFactor to simulate the fresnel effect
 	fragmentColor = mix(reflectionColor, refractionColor, refractiveFactor);
-
 	//Blend in a bit of bluish-green tint and add the specularHighlights
-	fragmentColor = mix(fragmentColor, vec4(0.0, 0.3, 0.5, 1.0), 0.3) + vec4(specularHighlights, 0.0f);
-
+	fragmentColor = mix(fragmentColor, vec4(0.0, 0.3, 0.5, 1.0), 0.2) + vec4(specularHighlights, 0.0f);
+	
 	//Fade out water close to edges of things sticking out
 	fragmentColor.a = clamp(pow(waterDepth/noTransparencyDepth, 3), 0, 1);
 
+	
 	//fragmentColor = vec4(vec3(pow(waterDepth/5.0, 5.0f)), 1);
 }

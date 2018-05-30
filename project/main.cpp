@@ -56,6 +56,7 @@ static const int PERLIN_NOISE_ARRAY_SIZES[] =
 };
 
 float farPlane = 4000.f;
+float nearPlane = 2.0f;
 
 //TODO: Remove this in favour of utilizing illumination map in the shaders
 //Global Light (the sun)
@@ -226,15 +227,15 @@ void initGL()
 	//		Setup Water class
 	///////////////////////////////////////////////////////////////////////
 	const float waterYPos = 30.0f;
-	const float waterSize = 20000.0f;
+	const float waterSize = 10000.0f;
 
 	//Reflection map resolution (higher is better and slower)
 	const float reflectionX = 1280;
 	const float reflectionY = 720;
 
 	//Refraction map resolution (higher is better and slower)
-	const float refractionX = 1920;
-	const float refractionY = 1080;
+	const float refractionX = 1280;
+	const float refractionY = 720;
 
 	water.init(waterYPos*worldUp, waterSize, vec2(reflectionX, reflectionY), vec2(refractionX, refractionY));
 
@@ -416,7 +417,7 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightColor", globalLightColor);
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightDirection", globalLightDirection);
 	//These need to match the near and far plane of the current projection matrix
-	labhelper::setUniformSlow(waterShaderProgram, "nearPlane", 1.0f);
+	labhelper::setUniformSlow(waterShaderProgram, "nearPlane", nearPlane);
 	labhelper::setUniformSlow(waterShaderProgram, "farPlane", farPlane);
 	//Binds necessary textures, VAO, and index buffer, and then calls drawElements
 	water.render();
@@ -435,7 +436,7 @@ void drawParticleSystem(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	labhelper::setUniformSlow(particleShaderProgram, "viewMatrix", viewMatrix);
 	labhelper::setUniformSlow(particleShaderProgram, "viewProjectionMatrix", projectionMatrix* viewMatrix );
 	labhelper::setUniformSlow(particleShaderProgram, "atlasRows", smokeParticleSystem.m_atlasRows);
-	labhelper::setUniformSlow(particleShaderProgram, "nearPlane", 1.0f);
+	labhelper::setUniformSlow(particleShaderProgram, "nearPlane", nearPlane);
 	labhelper::setUniformSlow(particleShaderProgram, "farPlane", farPlane);
 
 	//Bind preprocessed depthbuffer to be able to create soft particles
@@ -538,25 +539,14 @@ void drawSinglePassScene(GLuint currentShaderProgram, const mat4 &viewMatrix, co
 	debugDrawLight(viewMatrix, projectionMatrix, vec3(lightPosition));
 }
 
-bool showRefraction = false;
-
 //Draws everything in the preParticleFB to the screen in a fullscreen quad (Prevents having to re-rasterize and re-shade the scene)
 void drawPostProcessedQuad()
 {
 	glUseProgram(postProcessShaderProgram);
-	if (showRefraction) {
-		
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, preParticleFB.colorTextureTargets[0]);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, preParticleFB.depthBuffer);
-	}else
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, water.m_refractionFbo.colorTextureTargets[0]);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, water.m_refractionFbo.depthBuffer);
-	}
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, preParticleFB.colorTextureTargets[0]);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, preParticleFB.depthBuffer);
 
 	
 	labhelper::drawFullScreenQuad();
@@ -579,6 +569,16 @@ void display(void)
 		}
 	}
 
+	//Move water with camera, but do it discretely so it doesn't look like it follows the camera
+	/*vec3 distCameraToWaterCenter = getActiveCameraPosition() - vec3(water.m_modelMatrix[3][0], 0, water.m_modelMatrix[3][2]);
+	distCameraToWaterCenter.y = 0;
+	if (length(distCameraToWaterCenter) > 1000.0f) {
+		water.m_modelMatrix[3][0] = getActiveCameraPosition().x;
+		water.m_modelMatrix[3][2] = getActiveCameraPosition().z;
+	}*/
+
+	water.m_modelMatrix[3][0] = getActiveCameraPosition().x;
+	water.m_modelMatrix[3][2] = getActiveCameraPosition().z;
 	///////////////////////////////////////////////////////////////////////////
 	// Update particleSystems (This should happen in a logic main loop, but we have none
 	// so it goes here for now!)
@@ -603,7 +603,7 @@ void display(void)
 	// setup matrices 
 	///////////////////////////////////////////////////////////////////////////
 
-	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), 2.0f, float(farPlane));
+	mat4 projMatrix = perspective(radians(70.0f), float(windowWidth) / float(windowHeight), nearPlane, float(farPlane));
 
 	mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraDirection, worldUp);
 
@@ -650,12 +650,12 @@ void display(void)
 	{
 		vec3 reflectionDirection = normalize((getFighterPosition() - getActiveCameraPosition()));
 		reflectionDirection.y = -reflectionDirection.y;
-		reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + reflectionDirection, /* worldUp*/ vec3(-fighterModelMatrix[0].y, fighterModelMatrix[1].y, fighterModelMatrix[2].y));
+		reflectionViewMatrix = lookAt(reflectionCameraPosition, reflectionCameraPosition + reflectionDirection, worldUp);
 	}
 
 		
 	float renderPassOffset = 1.0f;
-	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -water.m_modelMatrix[3].y +1.0f));
+	drawSinglePassScene(shaderProgram, reflectionViewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, 1.0f, 0, -water.m_modelMatrix[3].y+1.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw below water for refraction
@@ -664,7 +664,7 @@ void display(void)
 	glViewport(0, 0, water.m_refractionFbo.width, water.m_refractionFbo.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//Offset the clipping plane slightly above the water to avoid black artefact lines along intersections with shallow terrain
-	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y + 1.0f));
+	drawSinglePassScene(shaderProgram, viewMatrix, projMatrix, lightViewMatrix, lightProjMatrix, vec4(0, -1, 0, water.m_modelMatrix[3].y+5.0f));
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera to pre-particle-buffer
@@ -741,7 +741,7 @@ bool handleEvents(void)
 	vec3 cameraRight = cross(cameraDirection, worldUp);
 
 	//Movment speed of ship
-	const float fighterSpeed = 100.0f;
+	const float fighterSpeed = 150.0f;
 	if (state[SDL_SCANCODE_W]) {
 		if(thirdPersonCameraActive)
 		{
@@ -771,7 +771,6 @@ bool handleEvents(void)
 	if(state[SDL_SCANCODE_SPACE])
 	{
 		shipVelocity = 100.0f;
-		showRefraction = !showRefraction;
 	}
 	if (state[SDL_SCANCODE_A]) {
 		if (thirdPersonCameraActive)
