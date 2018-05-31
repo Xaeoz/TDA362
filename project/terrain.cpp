@@ -75,7 +75,7 @@ void Terrain::generateHeightMap(float * perlinNoise, int perlinNoiseSize)
 		for (int k = 0; k < verticesPerRow; k++) {
 			heightMap[idx++] = x;
 			float perlinVal = perlinNoise[((yOffset + (j + j*meshSimplificationFactor)*rowLength) % perlinNoiseSize) + (k + k*meshSimplificationFactor + xOffset) % (rowLength)];
-			heightMap[idx++] = perlinVal;
+			heightMap[idx++] = clamp(perlinVal, 0.f, 1.f);
 			heightMap[idx++] = z;
 			x += vertexDistance;
 		}
@@ -97,9 +97,9 @@ float* Terrain::generateVertices(float * heightMap, float heightMultiplier)
 		for (int k = 0; k < verticesPerRow; k++) {
 
 			verts[idx++] = x*chunkSize;
-			float heightCurveVal = heightCurve[(int)(heightMap[idx] * 10)]; //for debugging
+			float heightCurveVal = heightCurve[(int)(heightMap[idx] * 1000)%1000]; //for debugging
 			float heightVal = heightMap[idx];
-			verts[idx++] = heightMap[idx] * heightMultiplier * sqr5(heightMap[idx]);//heightCurve[(int)(heightMap[idx] * 1000)];
+			verts[idx++] = heightMap[idx] * heightMultiplier * heightCurve[(int)(heightMap[idx]*1000) % 1000];//heightCurve[(int)(heightMap[idx] * 1000)];
 			verts[idx++] = z*chunkSize;
 			x += vertexDistance;
 		}

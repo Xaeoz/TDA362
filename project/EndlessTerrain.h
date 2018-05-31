@@ -17,14 +17,14 @@ public:
 		int octaves = 5;
 		float lacunarity = 4.6f;
 		float persistance = 0.2f;
-		float heightMultiplier = 1000.f;
-		int perlinNoiseSize = 250* 250;
+		float heightMultiplier = 200.f;
+		int perlinNoiseSize = 500*500;
 		int seedArraySize = 1000*1000;
 		int meshSimplificationFactor = 0;
 		float perlinSamplingStartOffset = 1.f;
-		int nSquares = 40*40;
+		int nSquares = 50*50;
 		int tesselation = nSquares * 2;
-		int chunkSize = 2000;
+		int chunkSize = 300;
 		float maxViewDistance = chunkSize*4;
 	};
 

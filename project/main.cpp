@@ -175,6 +175,7 @@ vector<Material> materials = { sand, grassGreen, grassDarkGreen, mountainLight, 
 enum MeshMode { MESHMODE_ON, MESHMODE_OFF };
 int meshMode = MESHMODE_ON;
 bool calcDirLight = true;
+bool collisionDetectionActive;
 //Collision Detection
 //Set radius of sphere to something slightly bigger than the distance between two vertices
 CollisionDetection collider(endlessTerrain.pparams->chunkSize / (sqrt(endlessTerrain.pparams->nSquares) + 1));
@@ -901,21 +902,25 @@ bool handleEvents(void)
 
 	}
 
-	/*Terrain currentChunkCam = endlessTerrain.getCurrentChunk(cameraPosition);
-	if (collider.willCollide(currentChunkCam, cameraPosition, cameraSpeed))
-	{
-		
-		cameraPosition = previousCameraPosition;
+
+	if (collisionDetectionActive) {
+		Terrain currentChunkCam = endlessTerrain.getCurrentChunk(cameraPosition);
+		if (collider.willCollide(currentChunkCam, cameraPosition, cameraSpeed))
+		{
+
+			cameraPosition = previousCameraPosition;
+		}
+
+
+		if (thirdPersonCameraActive) {
+			Terrain currentChunkFighter = endlessTerrain.getCurrentChunk(getFighterPosition());
+			if (fighterCollider.willCollide(currentChunkFighter, getFighterPosition(), fighterSpeed))
+			{
+				fighterModelMatrix = previousFighterModelMatrix;
+			}
+		}
 	}
 
-
-	if (thirdPersonCameraActive) {
-		Terrain currentChunkFighter = endlessTerrain.getCurrentChunk(getFighterPosition());
-		if (fighterCollider.willCollide(currentChunkFighter, getFighterPosition(), fighterSpeed))
-		{
-			fighterModelMatrix = previousFighterModelMatrix;
-		}
-	}*/
 
 
 	//if (collider2.willCollideTriangle(currentChunk, cameraPosition, cameraSpeed))
@@ -944,8 +949,9 @@ void gui()
 	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0f, 10000.0f);
 	ImGui::SliderFloat("Farplane", &farPlane, 0.0f, 10000.0f);
 	ImGui::SliderFloat("Environment Multiplier", &environment_multiplier, 0.0f, 10.0f);
-	ImGui::Text("MESHMODE");
 	ImGui::Checkbox("Direct Light: Active", &calcDirLight);
+	ImGui::Checkbox("Collision Detection: Active", &collisionDetectionActive);
+	ImGui::Text("MESHMODE");
 	ImGui::RadioButton("Mesh: On", &meshMode, MESHMODE_ON);
 	ImGui::RadioButton("Mesh: Off", &meshMode, MESHMODE_OFF);
 	ImGui::Text("Fog");
@@ -955,16 +961,6 @@ void gui()
 	ImGui::SliderFloat("Red", &fogColorR, 0.0f, 1.0f);
 	ImGui::SliderFloat("Green", &fogColorG, 0.0f, 1.0f);
 	ImGui::SliderFloat("Blue", &fogColorB, 0.0f, 1.0f);
-
-
-	ImGui::Text("Perlin Noise Array Size");
-	ImGui::RadioButton("64*64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	
-	ImGui::RadioButton("100*100", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[1]);
-	ImGui::RadioButton("300*300", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[2]);
-	ImGui::RadioButton("500*500", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[3]);
-	ImGui::RadioButton("800*800", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[4]);
-	ImGui::RadioButton("1000*1000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[5]);
-	ImGui::RadioButton("2000*2000", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[6]);
 
 	ImGui::Text("Material 1");
 	ImGui::SliderFloat("Blend 1", &materials[0].blendStrength, 0.01, 1.0);
