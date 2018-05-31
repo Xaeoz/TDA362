@@ -55,7 +55,7 @@ void Terrain::setLod(int meshSimplificationFactor, int chunkSize) {
 	this->meshSimplificationFactor = meshSimplificationFactor;
 }
 
-float* Terrain::generateHeightMap(float * perlinNoise, int perlinNoiseSize)
+void Terrain::generateHeightMap(float * perlinNoise, int perlinNoiseSize)
 {
 	float vertexDistance = 1.0f / float(verticesPerRow - 1);
 	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
@@ -81,13 +81,12 @@ float* Terrain::generateHeightMap(float * perlinNoise, int perlinNoiseSize)
 		}
 		z -= vertexDistance;
 	}
-	return heightMap;
 }
 
 float* Terrain::generateVertices(float * heightMap, float heightMultiplier)
 {
 	int nrOfVertices = verticesPerRow * verticesPerRow * 3;
-	//delete[] verts;
+	delete[] verts;
 	verts = new float[nrOfVertices];
 	float vertexDistance = 1.0f / float(verticesPerRow - 1);
 
@@ -214,8 +213,8 @@ float * Terrain::calculateVertexNormals(int * indices, float * surfaceNormals)
 void Terrain::initTerrain(float heightMultiplier, float * perlinNoise, int perlinNoiseSize, int chunkSize) {
 
 	int * indices = generateIndices();
-	heightMap = generateHeightMap(perlinNoise, perlinNoiseSize);
-	verts = generateVertices(heightMap, heightMultiplier);
+	generateHeightMap(perlinNoise, perlinNoiseSize);
+	generateVertices(heightMap, heightMultiplier);
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);
 	float * vertexNormals = calculateVertexNormals(indices, surfaceNormals);
@@ -255,8 +254,8 @@ void Terrain::initTerrain(float heightMultiplier, float * perlinNoise, int perli
 
 void Terrain::updateTerrain(float heightMultiplier, float * perlinNoise, int perlinNoiseSize, int meshSimplificationFactor, bool updateLod)
 {
-	heightMap = generateHeightMap(perlinNoise, perlinNoiseSize);
-	verts = generateVertices(heightMap, heightMultiplier);
+	generateHeightMap(perlinNoise, perlinNoiseSize);
+	generateVertices(heightMap, heightMultiplier);
 	int * indices = generateIndices();
 	float * tileTexCoords = generateTileTexCoords(16);
 	float * surfaceNormals = calculateSurfaceNormals(indices, verts);

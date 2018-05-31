@@ -70,7 +70,6 @@ bool isIntersectingTriangle(vec3 A, vec3 B, vec3 C, vec3 P, float r)
 	C = C - P;
 
 	vec3 N = normalize(cross(B - A,C - A));
-
 	float d = dot(A, N);
 	bool sep = (d*d > r*r);
 	return !sep;

@@ -81,6 +81,14 @@ GLuint postProcessShaderProgram;
 ///////////////////////////////////////////////////////////////////////////////
 Water water;
 
+////////////////////////////////////////////////////////////////////////////////
+// Fog
+///////////////////////////////////////////////////////////////////////////////
+bool fogActive = false;
+float fogDensity = 0.0035f;
+float fogGradient = 1.5f;
+float fogColorR = 0.5f, fogColorG = 0.5f, fogColorB = 0.5f;
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Particle
@@ -166,11 +174,12 @@ float * baseBlends = new float[materialsCount];
 vector<Material> materials = { sand, grassGreen, grassDarkGreen, mountainLight, mountainDark, mountainSnow };
 enum MeshMode { MESHMODE_ON, MESHMODE_OFF };
 int meshMode = MESHMODE_ON;
-
+bool calcDirLight = true;
 //Collision Detection
 //Set radius of sphere to something slightly bigger than the distance between two vertices
-CollisionDetection collider(endlessTerrain.pparams->chunkSize / sqrt(endlessTerrain.pparams->nSquares) + 2);
-CollisionDetection collider2(cameraSpeed+5);
+CollisionDetection collider(endlessTerrain.pparams->chunkSize / (sqrt(endlessTerrain.pparams->nSquares) + 1));
+CollisionDetection fighterCollider(endlessTerrain.pparams->chunkSize / (sqrt(endlessTerrain.pparams->nSquares) + 1));
+CollisionDetection collider2(5);
 
 void loadShaders(bool is_reload)
 {
@@ -205,7 +214,7 @@ void initGL()
 	landingpadModel = labhelper::loadModelFromOBJ("../scenes/landingpad.obj");
 	sphereModel     = labhelper::loadModelFromOBJ("../scenes/sphere.obj");
 
-	float landingPadYPosition = 35.0f;
+	float landingPadYPosition = 105.0f;
 
 	roomModelMatrix = mat4(1.0f);
 
@@ -422,6 +431,12 @@ void drawWater(const mat4 &viewMatrix, const mat4 &projectionMatrix)
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightPosition", globalLightPosition);
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightColor", globalLightColor);
 	labhelper::setUniformSlow(waterShaderProgram, "globalLightDirection", globalLightDirection);
+	labhelper::setUniformSlow(waterShaderProgram, "viewMatrix", viewMatrix);
+	//Fog
+	labhelper::setUniformSlow(waterShaderProgram, "fogActive", fogActive);
+	labhelper::setUniformSlow(waterShaderProgram, "fogColor", vec3(fogColorR, fogColorG, fogColorB));
+	labhelper::setUniformSlow(waterShaderProgram, "density", fogDensity);
+	labhelper::setUniformSlow(waterShaderProgram, "gradient", fogGradient);
 	//These need to match the near and far plane of the current projection matrix
 	labhelper::setUniformSlow(waterShaderProgram, "nearPlane", nearPlane);
 	labhelper::setUniformSlow(waterShaderProgram, "farPlane", farPlane);
@@ -505,16 +520,30 @@ void drawTerrain(const mat4 &viewMatrix, const mat4 &projectionMatrix, const glm
 	labhelper::setUniformSlow(heightShader, "environmentMultiplier", environment_multiplier);
 
 	// camera
+	labhelper::setUniformSlow(heightShader, "viewMatrix", viewMatrix);
 	labhelper::setUniformSlow(heightShader, "viewInverse", inverse(viewMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewProjectionMatrix", projectionMatrix * viewMatrix * terrainModelMatrix);
 	mat4 normalMatrix = inverse(transpose(viewMatrix * terrainModelMatrix));
 	labhelper::setUniformSlow(heightShader, "modelViewMatrix", viewMatrix * terrainModelMatrix);
+	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
 	labhelper::setUniformSlow(heightShader, "normalMatrix", normalMatrix);
+	labhelper::setUniformSlow(heightShader, "cameraPosition", getActiveCameraPosition());
+
+	//Light
+	labhelper::setUniformSlow(heightShader, "globalLightPosition", globalLightPosition);
+	labhelper::setUniformSlow(heightShader, "globalLightColor", globalLightColor);
+	labhelper::setUniformSlow(heightShader, "globalLightDirection", globalLightDirection);
+	labhelper::setUniformSlow(heightShader, "calculateDirectLighting", calcDirLight);
 
 	//Clipping
 	labhelper::setUniformSlow(heightShader, "clippingPlane", clipPlane);
 	labhelper::setUniformSlow(heightShader, "modelMatrix", terrainModelMatrix);
 
+	//Fog
+	labhelper::setUniformSlow(heightShader, "fogActive", fogActive);
+	labhelper::setUniformSlow(heightShader, "fogColor", vec3(fogColorR, fogColorG, fogColorB));
+	labhelper::setUniformSlow(heightShader, "density", fogDensity);
+	labhelper::setUniformSlow(heightShader, "gradient", fogGradient);
 	//Materials
 	for (int i = 0; i < materialsCount; i++) {
 		baseColours[i] = materials[i].tint;
@@ -724,7 +753,7 @@ bool handleEvents(void)
 		}
 		if (event.type == SDL_MOUSEWHEEL)
 		{
-			float zoomSpeed = 50.0f;
+			float zoomSpeed = 100.0f;
 			thirdPersonCamera.addDistance(float(-event.wheel.y)*deltaTime*zoomSpeed);
 		}
 		if (event.type == SDL_MOUSEMOTION && !ImGui::IsMouseHoveringAnyWindow()) {
@@ -756,10 +785,11 @@ bool handleEvents(void)
 	// check keyboard state (which keys are still pressed)
 	const uint8_t *state = SDL_GetKeyboardState(nullptr);
 	vec3 cameraRight = cross(cameraDirection, worldUp);
-	Terrain currentChunk = endlessTerrain.getCurrentChunk(cameraPosition);
+
 
 
 	vec3 previousCameraPosition = cameraPosition;
+	mat4 previousFighterModelMatrix = fighterModelMatrix;
 	//Movment speed of ship
 	const float fighterSpeed = 150.0f;
 	if (state[SDL_SCANCODE_W]) {
@@ -834,6 +864,7 @@ bool handleEvents(void)
 		{
 			vec3 totalMovement = fighterSpeed * deltaTime * vec3(0, 1, 0);
 			fighterModelMatrix = translate(totalMovement) * fighterModelMatrix;
+
 		}
 		else
 		{
@@ -870,10 +901,22 @@ bool handleEvents(void)
 
 	}
 
-	if (collider.willCollide(currentChunk, cameraPosition, cameraSpeed))
+	/*Terrain currentChunkCam = endlessTerrain.getCurrentChunk(cameraPosition);
+	if (collider.willCollide(currentChunkCam, cameraPosition, cameraSpeed))
 	{
+		
 		cameraPosition = previousCameraPosition;
 	}
+
+
+	if (thirdPersonCameraActive) {
+		Terrain currentChunkFighter = endlessTerrain.getCurrentChunk(getFighterPosition());
+		if (fighterCollider.willCollide(currentChunkFighter, getFighterPosition(), fighterSpeed))
+		{
+			fighterModelMatrix = previousFighterModelMatrix;
+		}
+	}*/
+
 
 	//if (collider2.willCollideTriangle(currentChunk, cameraPosition, cameraSpeed))
 	//{
@@ -900,9 +943,19 @@ void gui()
 	ImGui::SliderInt("Chunksize", &endlessTerrain.pparams->chunkSize, 0, 10000);
 	ImGui::SliderFloat("Viewdistance", &endlessTerrain.pparams->maxViewDistance, 0.0f, 10000.0f);
 	ImGui::SliderFloat("Farplane", &farPlane, 0.0f, 10000.0f);
+	ImGui::SliderFloat("Environment Multiplier", &environment_multiplier, 0.0f, 10.0f);
 	ImGui::Text("MESHMODE");
+	ImGui::Checkbox("Direct Light: Active", &calcDirLight);
 	ImGui::RadioButton("Mesh: On", &meshMode, MESHMODE_ON);
 	ImGui::RadioButton("Mesh: Off", &meshMode, MESHMODE_OFF);
+	ImGui::Text("Fog");
+	ImGui::Checkbox("Fog: Active", &fogActive);
+	ImGui::SliderFloat("Density", &fogDensity, 0.0001f, 0.01f);
+	ImGui::SliderFloat("Gradient", &fogGradient, 0.1f, 3.0f);
+	ImGui::SliderFloat("Red", &fogColorR, 0.0f, 1.0f);
+	ImGui::SliderFloat("Green", &fogColorG, 0.0f, 1.0f);
+	ImGui::SliderFloat("Blue", &fogColorB, 0.0f, 1.0f);
+
 
 	ImGui::Text("Perlin Noise Array Size");
 	ImGui::RadioButton("64*64", &endlessTerrain.pparams->perlinNoiseSize, PERLIN_NOISE_ARRAY_SIZES[0]);	

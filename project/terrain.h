@@ -35,7 +35,7 @@ public:
 
 	void setLod(int meshSimplificationFactor, int chunkSize);
 
-	float * generateHeightMap(float * perlinNoise, int perlinNoiseSize);
+	void generateHeightMap(float * perlinNoise, int perlinNoiseSize);
 
 	float * generateVertices(float * heightMap, float heightMultiplier);
 

@@ -89,7 +89,8 @@ void ParticleSystem::process_particles(float dt, vec3 cameraPosition, vec3 (*vel
 	glBindBuffer(GL_ARRAY_BUFFER, m_particles_age_buffer);
 	glBufferData(GL_ARRAY_BUFFER, m_max_size * 2 * sizeof(GLfloat), NULL, GL_STREAM_DRAW); // Buffer orphaning, a common way to improve streaming perf. See above link for details.
 	glBufferSubData(GL_ARRAY_BUFFER, 0, m_particles.size() * sizeof(GLfloat) * 2, particle_age_data);
-
+	delete[] particle_postion_size_data;
+	delete[] particle_age_data;
 	timeSinceLastSpawn += dt;
 	//delayed sorting (1-frame delay), not perfect, but better perofrmance overall
 	std::sort(m_particles.begin(), m_particles.end());

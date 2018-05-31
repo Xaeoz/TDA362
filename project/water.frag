@@ -8,7 +8,7 @@ in vec4 clipSpaceCoords;
 in vec2 texCoords;
 in vec3 toCameraVector;
 in vec3 fromLightVector;
-
+in float visibility;
 layout(location = 0) out vec4 fragmentColor;
 
 layout(binding = 0) uniform sampler2D reflectionTexture;
@@ -22,6 +22,8 @@ uniform float moveFactor;
 uniform vec3 globalLightDirection;
 uniform float farPlane;
 uniform float nearPlane;
+uniform bool fogActive;
+uniform vec3 fogColor;
 
 
 const float waveStrength = 0.004;				//Strength of the distortions to the textures
@@ -101,6 +103,11 @@ void main()
 	
 	//Fade out water close to edges of things sticking out
 	fragmentColor.a = clamp(pow(waterDepth/noTransparencyDepth, 3), 0, 1);
+
+	if(fogActive) {
+		fragmentColor = mix(vec4(fogColor, 1), fragmentColor, visibility);
+	}
+	
 
 	
 	//fragmentColor = vec4(vec3(pow(waterDepth/5.0, 5.0f)), 1);

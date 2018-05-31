@@ -16,9 +16,14 @@ uniform vec3 cameraPosition;
 //Position of the global light (like the sun)
 uniform vec3 globalLightPosition;
 
+uniform mat4 viewMatrix;
+
+uniform float density;
+uniform float gradient;
+
 //Tiling of the texCoords
 const float tiling = 100.0;
-
+out float visibility;
 
 void main()
 {
@@ -34,5 +39,10 @@ void main()
 
 	toCameraVector = cameraPosition - worldPosition.xyz;
 	fromLightVector = worldPosition.xyz - globalLightPosition;
+
+	//Fog
+	vec4 positionRelativeToCam = viewMatrix * vec4(position, 1.0);
+	float dist = length(positionRelativeToCam.xyz);
+	visibility = clamp(exp(-pow((dist*density), gradient)), 0, 1);
 	 
 }

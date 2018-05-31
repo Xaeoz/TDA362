@@ -113,8 +113,16 @@ Terrain EndlessTerrain::getCurrentChunk(vec3 viewPosition)
 	}
 	pair<int, int> viewPositionPair(currentChunkCoordX, currentChunkCoordY);
 	map<pair<int, int>, Terrain>::iterator it = terrainChunkDictionary.find(viewPositionPair);
-	Terrain currentChunk = it->second;
-	return currentChunk;
+	if (it != terrainChunkDictionary.end()) {
+		Terrain currentChunk = it->second;
+		return currentChunk;
+	}
+	else {
+		createNewTerrainChunk(vec2(currentChunkCoordX, currentChunkCoordX), viewPosition);
+		map<pair<int, int>, Terrain>::iterator it = terrainChunkDictionary.find(viewPositionPair);
+		return it->second;
+	}
+
 }
 
 //Used to update terrain from GUI
@@ -137,7 +145,7 @@ void EndlessTerrain::updateTerrainChunks(TerrainParams *tp, vec3 viewerPosition)
 	{
 		terrain.second.updateTerrain(tp->heightMultiplier, perlinNoise, tp->perlinNoiseSize, terrain.second.meshSimplificationFactor, false);
 	}
-	
+
 }
 
 float EndlessTerrain::calculateDistance(Terrain& terrain, vec3 viewerPosition)
@@ -232,6 +240,6 @@ void EndlessTerrain::loadTextures(const std::string * texturePaths, int nTexture
 		std::cout << "Successfully loaded texture: " << texturePaths[i] << ".\n";
 	}
 
-	//glGenerateMipmap(GL_TEXTURE_2D);
+	glGenerateMipmap(GL_TEXTURE_2D);
 	std::cout << "Successfully loaded textureArray \n";
 }
